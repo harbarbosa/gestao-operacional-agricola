@@ -1,7 +1,7 @@
 # Desenvolvimento local
 
 ## Estado desta entrega
-Estrutura inicial, API de saúde, login e perfis. Não há migrações de negócio nem sincronização implementadas. Ver [Autenticação](AUTENTICACAO.md) para preparar a base e contas. Usar apenas dados fictícios. Não implantar para operação real.
+Estrutura inicial, API de saúde, login e perfis. Há migrações de autenticação e dos primeiros cadastros. Diário de campo, tarifas e sincronização ainda não implementados. Ver [Autenticação](AUTENTICACAO.md) para preparar a base e contas. Usar apenas dados fictícios. Não implantar para operação real.
 
 ## Requisitos
 Node 22.12+ (ou versão LTS compatível), npm, PHP 8.3, Composer e extensões exigidas pelo CodeIgniter, incluindo intl e mbstring. MariaDB é necessário para login; o endpoint de saúde não verifica banco.
@@ -40,5 +40,5 @@ A estrutura pode ser preparada online e aberta sem rede, mas login e recuperaç�
 ## Origem do backend
 Base oficial codeigniter4/appstarter, commit 59112b3d9474b0ac8a9f217e8efb5ea2cd01ea88. Licença original preservada em backend/LICENSE. Dependências Composer ainda precisam de resolução e lockfile antes de implantação reproduzível.
 
-## Validação desta entrega
-Frontend: compilação de produção, análise de código e teste de persistência IndexedDB passaram no ambiente de desenvolvimento. PHP/Composer não estavam disponíveis; execução do backend e teste de saúde pendentes de validação no CI. Não houve teste em aparelhos reais.
+## Validação
+Frontend: compilação de produção, análise de código e seis testes passaram. A suíte do backend passou no GitHub Actions com PHP 8.3 em SQLite e no job MariaDB 11.4 (execução 42485109330), incluindo autenticação e cadastros. PHP/Composer não estavam disponíveis localmente. Não houve teste em aparelhos reais.
