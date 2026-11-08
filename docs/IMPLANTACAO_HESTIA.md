@@ -18,6 +18,8 @@ O template Apache específico agricola deriva do padrão, retirando a inclusão 
 
 Includes específicos do Nginx aplicam no-cache a index.html, sw.js, registerSW.js e manifest.webmanifest. API envia no-store. HTTP redireciona para HTTPS; certificado Let's Encrypt emitido para o domínio.
 
+Renovação verificada diariamente às 01:37 no fuso do servidor. O script deploy/renew_cert.py é instalado em /usr/local/sbin como arquivo de root, e /etc/cron.d/agricola-cert-renew chama-o somente para este domínio. Não executa código gravável pelo usuário da aplicação como root. Renova quando faltam menos de 30 dias; o teste inicial confirmou certificado válido por mais de 30 dias.
+
 ## Migrações
 O PHP CLI do servidor carrega pcntl, mas bloqueia pcntl_sigprocmask. O comando spark migrate desta versão do framework tenta chamar essa função. Não foi alterada a lista de funções bloqueadas.
 
