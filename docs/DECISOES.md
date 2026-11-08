@@ -5,18 +5,21 @@
 - Registo de trabalho offline obrigatório desde a primeira versão.
 - Suporte a Android e iPhone.
 - Forma de remuneração variável e configurável; não fixar uma única modalidade.
+- Preços individuais por trabalhador para o mesmo serviço.
+- Arquitetura aprovada: React/TypeScript/Vite PWA, IndexedDB/Dexie, CodeIgniter 4 e MariaDB. Ver [arquitetura](ARQUITETURA.md).
+- Sincronização com aplicação aberta e fecho financeiro online.
 
 As restantes propostas ainda precisam de validação.
 
 | Tema | Proposta inicial | O que confirmar |
 |---|---|---|
-| Plataforma | Proposta: web responsiva instalável (PWA) para Android e iPhone | Versões mínimas e navegadores suportados |
+| Plataforma | Web responsiva instalável (PWA) para Android e iPhone (aprovado) | Versões mínimas e navegadores suportados |
 | Operação offline | Obrigatória na primeira versão (confirmado) | Duração sem ligação e dispositivos partilhados |
 | Organização | Uma empresa (confirmado) | Sem arquitetura multiempresa no escopo inicial |
-| Tecnologia | Decidir antes da implementação | Alojamento, manutenção e experiência da equipa |
+| Tecnologia | React/TypeScript/Vite, PWA, Dexie, CodeIgniter 4 e MariaDB (aprovado) | Fixar versões compatíveis e verificar extensões PHP |
 | Idioma/moeda | Português de Portugal / EUR | Outros idiomas e moedas? |
 | Horários | Europe/Lisbon | Pausas, turnos noturnos e horas extra |
-| Remuneração | Modalidade e unidade configuráveis (confirmado): hora, dia, produção e outras unidades | Exceções por trabalhador/função/equipa e regras de combinação ainda a validar |
+| Remuneração | Modalidade e unidade configuráveis (confirmado): hora, dia, produção e outras unidades | Preços individuais confirmados; regras por função/equipa e combinação ainda a validar |
 | Produção coletiva | Registo separado da individual | Como distribuir quantidades e valores? |
 | Cobrança ao cliente | Quantidade própria por serviço | A unidade cobrada pode diferir da unidade paga? |
 | Validação | Fluxo rascunho/validado/fechado | Quem valida e quem fecha? |
@@ -41,6 +44,6 @@ Não considerar sincronização com a aplicação fechada como requisito garanti
 Usar três exemplos: trabalhador pago por hora, trabalhador pago por produção individual e equipa com produção coletiva. Para cada um, definir quantidade paga, quantidade cobrada ao cliente, preço, pausas, arredondamento, fecho e eventual correção.
 
 ## Hospedagem inicial prevista
-O responsável indicou Hestia como primeira opção de hospedagem. Esta escolha é provisória e não confirma uma tecnologia de aplicação.
+O responsável indicou Hestia como primeira opção de hospedagem. Esta escolha de hospedagem é provisória; a tecnologia da aplicação está aprovada em ARQUITETURA.md.
 
-Antes de fechar a arquitetura, inventariar versões e serviços disponíveis, capacidade do servidor, suporte a processos da aplicação, base de dados, tarefas agendadas, domínio/HTTPS e procedimento de backup e restauro. Não há autorização implícita para alterar o servidor ou publicar a aplicação nesta etapa.
+Antes da implantação, verificar versões e serviços disponíveis, capacidade do servidor, suporte a processos da aplicação, base de dados, tarefas agendadas, domínio/HTTPS e procedimento de backup e restauro. Não há autorização implícita para alterar o servidor ou publicar a aplicação nesta etapa.
