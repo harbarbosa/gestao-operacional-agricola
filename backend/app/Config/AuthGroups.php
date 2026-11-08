@@ -12,11 +12,12 @@ class AuthGroups extends \CodeIgniter\Shield\Config\AuthGroups
     ];
     public array $permissions = [
         'users.view' => 'Consultar utilizadores.',
+        'catalog.manage' => 'Consultar e gerir cadastros operacionais.',
         'field.record' => 'Registar trabalho nas equipas autorizadas.',
         'own.view' => 'Consultar os próprios dados.',
     ];
     public array $matrix = [
-        'admin' => ['users.view', 'field.record', 'own.view'],
+        'admin' => ['catalog.manage', 'users.view', 'field.record', 'own.view'],
         'supervisor' => ['field.record', 'own.view'],
         'worker' => ['own.view'],
     ];
