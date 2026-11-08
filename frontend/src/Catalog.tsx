@@ -2,7 +2,7 @@ import { useEffect, useState, type SubmitEvent } from 'react'
 import { api, ApiError } from './api'
 import { catalogs, payloadFor, type CatalogItem, type CatalogList, type Field, type Resource } from './catalog'
 
-function ReferenceField({ field, value, onChange, disabled }: { field: Field; value: string; onChange: (value: string) => void; disabled: boolean }) {
+export function ReferenceField({ field, value, onChange, disabled, emptyLabel = 'Sem equipa' }: { field: Field; value: string; onChange: (value: string) => void; disabled: boolean; emptyLabel?: string }) {
   const [search, setSearch] = useState('')
   const [items, setItems] = useState<CatalogItem[]>([])
   const [selected, setSelected] = useState<CatalogItem | null>(null)
@@ -28,7 +28,7 @@ function ReferenceField({ field, value, onChange, disabled }: { field: Field; va
   return <>
     <input aria-label={`Pesquisar opções: ${field.label}`} placeholder="Pesquisar opções por nome" value={search} onChange={e => setSearch(e.target.value)} disabled={disabled} />
     <select id={field.key} required={field.required} value={value} onChange={e => onChange(e.target.value)} disabled={disabled}>
-      <option value="">{field.required ? 'Selecione…' : 'Sem equipa'}</option>
+      <option value="">{field.required ? 'Selecione…' : emptyLabel}</option>
       {choices.map(item => <option key={item.id} value={item.id}>{item.name}{item.is_active ? '' : ' (inativo)'}</option>)}
     </select>
     <small>Mostra até 25 resultados. Pesquise pelo nome para encontrar outros registos.</small>

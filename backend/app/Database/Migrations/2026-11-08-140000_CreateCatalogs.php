@@ -49,7 +49,7 @@ class CreateCatalogs extends Migration
                     $this->forge->addForeignKey($name, 'agri_units', 'id', 'RESTRICT', 'RESTRICT');
                 }
             }
-            $this->forge->createTable('agri_' . $table);
+            $this->forge->createTable('agri_' . $table, false, $this->db->getPlatform() === 'MySQLi' ? ['ENGINE' => 'InnoDB'] : []);
         }
         $this->forge->addField([
             'id' => ['type' => 'INT', 'unsigned' => true, 'auto_increment' => true],
@@ -63,7 +63,7 @@ class CreateCatalogs extends Migration
         ]);
         $this->forge->addKey('id', true);
         $this->forge->addKey(['resource', 'record_id']);
-        $this->forge->createTable('agri_catalog_audit');
+        $this->forge->createTable('agri_catalog_audit', false, $this->db->getPlatform() === 'MySQLi' ? ['ENGINE' => 'InnoDB'] : []);
     }
 
     public function down()
