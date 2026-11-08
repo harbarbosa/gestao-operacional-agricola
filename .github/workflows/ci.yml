@@ -50,6 +50,7 @@ jobs:
           --health-timeout=5s
           --health-retries=20
     env:
+      EXPECTED_TEST_DB: MySQLi
       database.tests.DBDriver: MySQLi
       database.tests.hostname: 127.0.0.1
       database.tests.database: agri_test

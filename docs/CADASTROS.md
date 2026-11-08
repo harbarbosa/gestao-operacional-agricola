@@ -9,7 +9,7 @@ Listagem com pesquisa por nome e paginação (25 itens), criação, edição e d
 - Unidades: nome e código único configurável (por exemplo hora, dia, caixa, arvore ou hectare).
 - Serviços: nome, observações, unidade de pagamento ao trabalhador e unidade de cobrança ao cliente independentes.
 
-Unidades são cadastradas pela interface antes de criar serviços. Não há valores ou cálculos financeiros nesta etapa. Tarifas com vigência, preços individuais por trabalhador e explorações agrícolas pertencem às próximas entregas da issue #3.
+Unidades são cadastradas pela interface antes de criar serviços. Tarifas com vigência e preços individuais por trabalhador estão descritos em [Preços](PRECOS.md). Explorações agrícolas continuam pendentes da issue #3.
 
 ## Acesso
 Permissão catalog.manage atribuída apenas ao administrador. Chefes de equipa e trabalhadores não consultam estes cadastros globais. A consulta por equipa autorizada será implementada na operação de campo; não conceder acesso global para contornar esse trabalho.

@@ -19,3 +19,10 @@ foreach (['workers', 'teams', 'clients', 'units', 'services'] as $resource) {
     $routes->post('api/v1/catalog/' . $resource, 'CatalogController::create/' . $resource, $options);
     $routes->put('api/v1/catalog/' . $resource . '/([1-9][0-9]*)', 'CatalogController::update/' . $resource . '/$1', $options);
 }
+
+$prices = ['filter' => 'api-session:prices.manage'];
+$routes->get('api/v1/prices', 'PricesController::index', $prices);
+$routes->post('api/v1/prices', 'PricesController::create', $prices);
+$routes->post('api/v1/prices/preview', 'PricesController::preview', $prices);
+$routes->post('api/v1/prices/([1-9][0-9]*)/end', 'PricesController::end/$1', $prices);
+$routes->post('api/v1/prices/([1-9][0-9]*)/cancel', 'PricesController::cancel/$1', $prices);

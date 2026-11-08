@@ -12,7 +12,8 @@
     "require": {
         "php": "^8.2",
         "codeigniter4/framework": "^4.7",
-        "codeigniter4/shield": "^1.2"
+        "codeigniter4/shield": "^1.2",
+        "brick/math": "^0.14"
     },
     "require-dev": {
         "fakerphp/faker": "^1.9",
