@@ -10,12 +10,12 @@ export function ReferenceField({ field, value, onChange, disabled, emptyLabel = 
   useEffect(() => {
     let active = true
     const timer = setTimeout(() => {
-      api<CatalogList>(`/catalog/${field.resource}?q=${encodeURIComponent(search)}`)
+      api<CatalogList>(`/catalog/${field.resource}?q=${encodeURIComponent(search)}${field.query ? `&${field.query}` : ''}`)
         .then(data => { if (active) { setItems(data.items.filter(item => includeInactive || item.is_active)); setError('') } })
         .catch(() => { if (active) setError('Não foi possível carregar as opções. Verifique a sessão e a ligação.') })
     }, 250)
     return () => { active = false; clearTimeout(timer) }
-  }, [search, field.resource, includeInactive])
+  }, [search, field.resource, field.query, includeInactive])
   useEffect(() => {
     let active = true
     if (value) api<{ item: CatalogItem }>(`/catalog/${field.resource}/${value}`)

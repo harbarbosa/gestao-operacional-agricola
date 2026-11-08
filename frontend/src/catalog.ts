@@ -1,11 +1,17 @@
-export type Resource = 'workers' | 'teams' | 'clients' | 'units' | 'services'
+export type Resource = 'workers' | 'teams' | 'clients' | 'units' | 'services' | 'sites'
 export type CatalogItem = {
   id: number; version: number; name: string; is_active: boolean
   [key: string]: string | number | boolean | null
 }
 export interface CatalogList { items: CatalogItem[]; page: number; pageSize: number; total: number }
-export interface Field { key: string; label: string; type?: 'email' | 'textarea' | 'reference'; required?: boolean; max?: number; resource?: Resource }
+export interface Field { key: string; label: string; type?: 'email' | 'textarea' | 'reference'; required?: boolean; max?: number; resource?: Resource; query?: string }
 export const catalogs: Record<Resource, { label: string; fields: Field[] }> = {
+  sites: { label: 'Locais', fields: [
+    { key: 'name', label: 'Nome do local / exploração', required: true, max: 160 },
+    { key: 'client_id', label: 'Cliente', type: 'reference', resource: 'clients', required: true },
+    { key: 'locality', label: 'Localidade', max: 160 },
+    { key: 'notes', label: 'Observações', type: 'textarea', max: 2000 },
+  ] },
   workers: { label: 'Trabalhadores', fields: [
     { key: 'name', label: 'Nome', required: true, max: 160 },
     { key: 'email', label: 'Email', type: 'email', max: 254 },

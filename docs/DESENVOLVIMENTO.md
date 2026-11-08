@@ -1,7 +1,7 @@
 # Desenvolvimento local
 
 ## Estado desta entrega
-Estrutura inicial, API de saúde, login e perfis. Há migrações de autenticação e dos primeiros cadastros. Tarifas com vigência estão implementadas; diário de campo e sincronização continuam pendentes. Ver [Preços](PRECOS.md). Ver [Autenticação](AUTENTICACAO.md) para preparar a base e contas. Usar apenas dados fictícios. Não implantar para operação real.
+Estrutura inicial, API de saúde, login e perfis. Há migrações de autenticação e dos primeiros cadastros. Tarifas com vigência estão implementadas; locais e diário em rascunho estão disponíveis, sem fechamento ou sincronização. Ver [Diário de campo](DIARIO_CAMPO.md). Ver [Preços](PRECOS.md). Ver [Autenticação](AUTENTICACAO.md) para preparar a base e contas. Usar apenas dados fictícios. Não implantar para operação real.
 
 ## Requisitos
 Node 22.12+ (ou versão LTS compatível), npm, PHP 8.3, Composer e extensões exigidas pelo CodeIgniter, incluindo intl e mbstring. MariaDB é necessário para login; o endpoint de saúde não verifica banco.
