@@ -23,7 +23,7 @@ As restantes propostas ainda precisam de validação.
 | Correções | Estorno com motivo e auditoria | Quem autoriza e quais períodos ficam bloqueados? |
 | Financeiro | Controlo operacional | Há impostos, descontos ou integrações fiscais no escopo? |
 | Acesso do trabalhador | Opcional | Ativar na primeira versão? |
-| Infraestrutura | Desenvolvimento e produção separados | Servidor, domínio, responsáveis e política de backups |
+| Infraestrutura | Hestia como hospedagem inicial prevista; desenvolvimento e produção separados | Confirmar versões disponíveis, recursos, domínio, HTTPS, tarefas agendadas e backups |
 | Retenção | Definir antes do uso real | Quais dados de identificação são necessários e por quanto tempo? |
 
 ## Validação em dispositivos
@@ -39,3 +39,8 @@ Não considerar sincronização com a aplicação fechada como requisito garanti
 
 ## Próxima sessão de definição
 Usar três exemplos: trabalhador pago por hora, trabalhador pago por produção individual e equipa com produção coletiva. Para cada um, definir quantidade paga, quantidade cobrada ao cliente, preço, pausas, arredondamento, fecho e eventual correção.
+
+## Hospedagem inicial prevista
+O responsável indicou Hestia como primeira opção de hospedagem. Esta escolha é provisória e não confirma uma tecnologia de aplicação.
+
+Antes de fechar a arquitetura, inventariar versões e serviços disponíveis, capacidade do servidor, suporte a processos da aplicação, base de dados, tarefas agendadas, domínio/HTTPS e procedimento de backup e restauro. Não há autorização implícita para alterar o servidor ou publicar a aplicação nesta etapa.
