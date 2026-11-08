@@ -71,4 +71,7 @@ Requisito confirmado: a modalidade varia e deve ser configurável.
 - Guardar a versão da regra e do preço utilizada; alterações de cadastro não recalculam registos fechados.
 - Disponibilizar as regras necessárias no dispositivo antes do uso offline; divergências encontradas na sincronização devem ficar visíveis para validação, sem substituição silenciosa dos valores.
 - Pagamento por produção coletiva exige regra de distribuição explícita antes da implementação.
-- Ainda a validar: preços específicos por trabalhador/função/equipa, proporcionalidade de diárias, pausas, horas extra, mínimos, arredondamento e eventual combinação de modalidades.
+- Confirmado: trabalhadores podem receber preços diferentes pelo mesmo serviço.
+- Proposta de prioridade: usar o preço específico do trabalhador para o serviço, unidade e período; na ausência de exceção, usar o preço padrão do serviço. Não aceitar regras individuais sobrepostas ou ausência de preço sem sinalizar para correção.
+- Alterações de preços individuais devem ter vigência e auditoria; o lançamento fechado conserva o preço efetivamente aplicado.
+- Ainda a validar: preços por função/equipa, proporcionalidade de diárias, pausas, horas extra, mínimos, arredondamento e eventual combinação de modalidades.
