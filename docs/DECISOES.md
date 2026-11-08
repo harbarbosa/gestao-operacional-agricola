@@ -1,12 +1,16 @@
-# Decisões pendentes
+# Decisões e pontos pendentes
 
-Estas propostas orientam o planeamento e ainda não constituem escolhas definitivas.
+## Confirmado pelo responsável
+- Uma única empresa.
+- Registo de trabalho offline obrigatório desde a primeira versão.
+
+As restantes propostas ainda precisam de validação.
 
 | Tema | Proposta inicial | O que confirmar |
 |---|---|---|
-| Plataforma | Web responsiva; avaliar PWA | É necessária instalação ou operação sem internet? |
-| Operação offline | Não assumir na primeira versão | Existe sinal nos locais? Quanto tempo sem ligação? |
-| Organização | Uma empresa inicialmente | Será um produto para várias empresas independentes? |
+| Plataforma | Proposta: web responsiva instalável (PWA) | Validar dispositivos e navegadores utilizados |
+| Operação offline | Obrigatória na primeira versão (confirmado) | Duração sem ligação e dispositivos partilhados |
+| Organização | Uma empresa (confirmado) | Sem arquitetura multiempresa no escopo inicial |
 | Tecnologia | Decidir antes da implementação | Alojamento, manutenção e experiência da equipa |
 | Idioma/moeda | Português de Portugal / EUR | Outros idiomas e moedas? |
 | Horários | Europe/Lisbon | Pausas, turnos noturnos e horas extra |
