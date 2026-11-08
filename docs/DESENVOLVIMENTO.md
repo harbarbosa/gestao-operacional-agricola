@@ -1,10 +1,10 @@
 # Desenvolvimento local
 
 ## Estado desta entrega
-Estrutura inicial, API de saúde e rascunho local de demonstração. Não há autenticação, migrações de negócio, contas de utilizadores ou sincronização implementadas. Usar apenas dados fictícios. Não implantar para operação real.
+Estrutura inicial, API de saúde, login e perfis. Não há migrações de negócio nem sincronização implementadas. Ver [Autenticação](AUTENTICACAO.md) para preparar a base e contas. Usar apenas dados fictícios. Não implantar para operação real.
 
 ## Requisitos
-Node 22.12+ (ou versão LTS compatível), npm, PHP 8.3, Composer e extensões exigidas pelo CodeIgniter, incluindo intl e mbstring. MariaDB será necessário na etapa de persistência central; o endpoint de saúde não verifica banco.
+Node 22.12+ (ou versão LTS compatível), npm, PHP 8.3, Composer e extensões exigidas pelo CodeIgniter, incluindo intl e mbstring. MariaDB é necessário para login; o endpoint de saúde não verifica banco.
 
 ## Backend
 Na pasta backend:
@@ -32,12 +32,10 @@ npm run build
 ```
 No backend: composer test. O teste de saúde está em tests/app/HealthTest.php.
 
-## Demonstração offline
-Na pasta frontend, executar npm run build e npm run preview. Abrir online primeiro para preparar o cache; depois interromper a rede, reabrir e guardar uma nota fictícia. O Service Worker não é ativado no modo dev.
-O preview serve apenas o frontend e não encaminha /api. Não indica disponibilidade do backend.
+## Offline
+Na pasta frontend, executar npm run build e npm run preview para testar a estrutura PWA. O preview não encaminha /api: testar autenticação em npm run dev com backend ativo ou numa origem configurada que sirva frontend e API.
 
-O rascunho é único por navegador e não isolado por conta nesta demonstração. IndexedDB guarda apenas data e observações; não há fila de envio nem transmissão de dados. Limpar dados do navegador elimina o rascunho. Não depender da demonstração para trabalho real.
-Ícones finais em PNG e validação de instalação/abertura offline em Android e iPhone ainda fazem parte da entrega PWA completa.
+A estrutura pode ser preparada online e aberta sem rede, mas login e recuperação da sessão requerem API disponível nesta etapa. Registo offline autenticado e sincronização ainda não foram implementados. O módulo demonstrativo db.ts continua coberto por teste de persistência, sem ser exposto na interface autenticada. Não usar dados reais.
 
 ## Origem do backend
 Base oficial codeigniter4/appstarter, commit 59112b3d9474b0ac8a9f217e8efb5ea2cd01ea88. Licença original preservada em backend/LICENSE. Dependências Composer ainda precisam de resolução e lockfile antes de implantação reproduzível.

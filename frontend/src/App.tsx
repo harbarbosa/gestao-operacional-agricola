@@ -1,47 +1,68 @@
-import { useEffect, useState } from 'react'
-import { db, saveDraft } from './db'
+import { useEffect, useState, type SubmitEvent } from 'react'
+import { api, ApiError, type CurrentUser } from './api'
 import './App.css'
 
+const roleNames: Record<string, string> = { admin: 'Administrador', supervisor: 'Chefe de equipa', worker: 'Trabalhador' }
+
 export default function App() {
-  const [online, setOnline] = useState(navigator.onLine)
-  const [notes, setNotes] = useState('')
-  const [date, setDate] = useState(() => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` })
-  const [ready, setReady] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('A carregar rascunho…')
+  const [user, setUser] = useState<CurrentUser | null>(null)
+  const [checking, setChecking] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [message, setMessage] = useState('')
+  const [users, setUsers] = useState<CurrentUser[]>([])
   useEffect(() => {
-    const on = () => setOnline(true)
-    const off = () => setOnline(false)
-    window.addEventListener('online', on)
-    window.addEventListener('offline', off)
     let active = true
-    db.drafts.get('demo').then(draft => {
-      if (!active) return
-      if (draft) { setNotes(draft.notes); setDate(draft.workDate) }
-      setReady(true)
-      setMessage(draft ? 'Rascunho recuperado do aparelho.' : '')
-    }).catch(() => { if (active) setMessage('Não foi possível abrir o armazenamento local. O registo está indisponível.') })
-    return () => { active = false; window.removeEventListener('online', on); window.removeEventListener('offline', off) }
+    api<{ user: CurrentUser }>('/auth/me').then(data => { if (active) setUser(data.user) }).catch(error => {
+      if (active && (!(error instanceof ApiError) || error.status !== 401)) setMessage('Sem ligação ao servidor. Inicie sessão com internet para continuar.')
+    }).finally(() => { if (active) setChecking(false) })
+    return () => { active = false }
   }, [])
-  async function save(event: React.SubmitEvent<HTMLFormElement>) {
+  async function login(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
-    setSaving(true)
+    setBusy(true); setMessage('')
     try {
-      await saveDraft({ id: 'demo', workDate: date, notes, updatedAt: new Date().toISOString() })
-      setMessage('Guardado apenas neste aparelho. Ainda não existe sincronização.')
-    } catch { setMessage('Falha ao guardar. Mantenha esta página aberta e tente novamente.') }
-    finally { setSaving(false) }
+      const data = await api<{ user: CurrentUser }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) })
+      setUser(data.user)
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Falha ao iniciar sessão.') }
+    finally { setPassword(''); setBusy(false) }
+  }
+  async function logout() {
+    setBusy(true)
+    try {
+      await api('/auth/logout', { method: 'POST', body: '{}' })
+      setUser(null); setUsers([]); setMessage('Sessão terminada.')
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) { setUser(null); setUsers([]) }
+      setMessage('Não foi possível confirmar o fim da sessão. Verifique a ligação e tente novamente.')
+    } finally { setBusy(false) }
+  }
+  async function loadUsers() {
+    setBusy(true); setMessage('')
+    try { setUsers((await api<{ users: CurrentUser[] }>('/users')).users) }
+    catch (error) {
+      if (error instanceof ApiError && error.status === 401) { setUser(null); setUsers([]) }
+      setMessage(error instanceof Error ? error.message : 'Falha ao consultar.')
+    } finally { setBusy(false) }
   }
   return <main>
-    <header><span className="brand">GESTÃO AGRÍCOLA</span><span className="badge">{online ? 'Ligação disponível' : 'Sem ligação'}</span></header>
-    <section className="intro"><p>BASE DE DESENVOLVIMENTO</p><h1>A operação começa no campo.</h1><p>Primeira estrutura do sistema de gestão de equipas, produção e serviços.</p></section>
-    <aside><strong>Protótipo técnico</strong><p>Use apenas dados fictícios. Autenticação, contas individuais e sincronização ainda não estão implementadas. A ligação indicada não confirma disponibilidade do servidor.</p></aside>
-    <section className="card"><h2>Rascunho de campo</h2><p>Guarde uma nota e reabra a aplicação para verificar a persistência local.</p>
-      <form onSubmit={save}><label htmlFor="date">Data do trabalho</label><input id="date" type="date" required value={date} disabled={!ready} onChange={e => setDate(e.target.value)} />
-        <label htmlFor="notes">Observações de demonstração</label><textarea id="notes" required maxLength={2000} value={notes} disabled={!ready} onChange={e => setNotes(e.target.value)} />
-        <button disabled={!ready || saving}>{saving ? 'A guardar…' : 'Guardar no aparelho'}</button><p role="status" aria-live="polite">{message}</p>
-      </form>
+    <header><span className="brand">GESTÃO AGRÍCOLA</span><span className="badge">{user ? 'Sessão iniciada' : 'Acesso à empresa'}</span></header>
+    <section className="intro"><p>GESTÃO OPERACIONAL</p><h1>A operação começa no campo.</h1><p>Equipas, trabalho e produção numa única plataforma.</p></section>
+    <section className="card">
+      {checking ? <p role="status">A verificar sessão…</p> : user ? <>
+        <h2>Olá, {user.username}</h2><p>{user.groups.map(role => roleNames[role] ?? role).join(' · ')}</p>
+        <p>O acesso está preparado. Os módulos operacionais estão em desenvolvimento.</p>
+        {user.permissions.includes('users.view') && <><button disabled={busy} onClick={loadUsers}>Consultar utilizadores</button>
+          <ul>{users.map(item => <li key={item.id}>{item.username} — {item.groups.map(role => roleNames[role] ?? role).join(', ')}</li>)}</ul></>}
+        <button disabled={busy} onClick={logout}>Terminar sessão</button>
+      </> : <><h2>Iniciar sessão</h2><form onSubmit={login}>
+        <label htmlFor="email">Email</label><input id="email" type="email" autoComplete="username" required maxLength={254} value={email} onChange={e => setEmail(e.target.value)} disabled={busy} />
+        <label htmlFor="password">Palavra-passe</label><input id="password" type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} disabled={busy} />
+        <button disabled={busy}>{busy ? 'A iniciar…' : 'Entrar'}</button>
+      </form><p>As contas são criadas pelo responsável do sistema.</p></>}
+      <p role="status" aria-live="polite">{message}</p>
     </section>
-    <footer>Uma empresa · Android e iPhone · Registo offline em desenvolvimento</footer>
+    <footer>Versão de desenvolvimento. Login requer internet. A operação offline autenticada será integrada na etapa de sincronização.</footer>
   </main>
 }
