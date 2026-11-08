@@ -4,6 +4,7 @@
 - Uma única empresa.
 - Registo de trabalho offline obrigatório desde a primeira versão.
 - Suporte a Android e iPhone.
+- Forma de remuneração variável e configurável; não fixar uma única modalidade.
 
 As restantes propostas ainda precisam de validação.
 
@@ -15,7 +16,7 @@ As restantes propostas ainda precisam de validação.
 | Tecnologia | Decidir antes da implementação | Alojamento, manutenção e experiência da equipa |
 | Idioma/moeda | Português de Portugal / EUR | Outros idiomas e moedas? |
 | Horários | Europe/Lisbon | Pausas, turnos noturnos e horas extra |
-| Remuneração | Por serviço e unidade | Preço individual, por função ou por equipa? |
+| Remuneração | Modalidade e unidade configuráveis (confirmado): hora, dia, produção e outras unidades | Exceções por trabalhador/função/equipa e regras de combinação ainda a validar |
 | Produção coletiva | Registo separado da individual | Como distribuir quantidades e valores? |
 | Cobrança ao cliente | Quantidade própria por serviço | A unidade cobrada pode diferir da unidade paga? |
 | Validação | Fluxo rascunho/validado/fechado | Quem valida e quem fecha? |
