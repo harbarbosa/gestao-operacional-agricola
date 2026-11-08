@@ -14,6 +14,6 @@ final class HealthTest extends CIUnitTestCase
         $result = $this->get('/api/v1/health');
         $result->assertStatus(200);
         $result->assertJSONExact(['status' => 'ok']);
-        $result->assertHeader('Cache-Control', 'no-store');
+        $result->assertHeader('Cache-Control', 'no-store, max-age=0, no-cache');
     }
 }
