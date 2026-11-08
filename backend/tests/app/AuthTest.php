@@ -18,6 +18,9 @@ final class AuthTest extends CIUnitTestCase
 
     protected function setUp(): void
     {
+        $this->resetServices();
+        $_SESSION = [];
+        $_COOKIE = [];
         parent::setUp();
         helper(['auth', 'setting']);
         $settings = config('Settings');
@@ -60,7 +63,9 @@ final class AuthTest extends CIUnitTestCase
         $this->createUser();
         $result = $this->credentials();
         $result->assertStatus(200);
-        $result->assertJSONFragment(['username' => 'exampleuser', 'groups' => ['worker']]);
+        $data = json_decode($result->getJSON(), true);
+        $this->assertSame('exampleuser', $data['user']['username']);
+        $this->assertSame(['worker'], $data['user']['groups']);
         $this->assertStringNotContainsString('ExampleTestPassword', $result->getJSON());
         $this->assertStringNotContainsString('secret', $result->getJSON());
     }
@@ -81,6 +86,7 @@ final class AuthTest extends CIUnitTestCase
 
     public function testLoginWithoutCsrfIsRejected(): void
     {
+        $this->expectException(\CodeIgniter\Security\Exceptions\SecurityException::class);
         $this->withHeaders(['X-Requested-With' => 'XMLHttpRequest'])
             ->withBodyFormat('json')->post('/api/v1/auth/login', [
                 'email' => 'example@example.test', 'password' => 'ExampleTestPassword123!',
@@ -127,8 +133,9 @@ final class AuthTest extends CIUnitTestCase
 
     public function testNoPublicRegistrationRoute(): void
     {
-        $this->get('/register')->assertStatus(404);
         $this->assertFalse(config('Auth')->allowRegistration);
+        $this->expectException(\CodeIgniter\Exceptions\PageNotFoundException::class);
+        $this->get('/register');
     }
 
     public function testLoginRateLimitCannotBeAvoidedByNewSession(): void
