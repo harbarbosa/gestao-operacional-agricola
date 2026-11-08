@@ -3,6 +3,7 @@ import { api, ApiError, type CurrentUser } from './api'
 import './App.css'
 import Catalog from './Catalog'
 import Prices from './Prices'
+import WorkLogs from './WorkLogs'
 import { catalogs, type Resource } from './catalog'
 
 const roleNames: Record<string, string> = { admin: 'Administrador', supervisor: 'Chefe de equipa', worker: 'Trabalhador' }
@@ -16,7 +17,7 @@ export default function App() {
   const [message, setMessage] = useState('')
   const [users, setUsers] = useState<CurrentUser[]>([])
   const [catalogBusy, setCatalogBusy] = useState(false)
-  const [resource, setResource] = useState<Resource | 'prices'>('workers')
+  const [resource, setResource] = useState<Resource | 'prices' | 'work-logs'>('workers')
   const sessionExpired = useCallback(() => { setUser(null); setUsers([]); setMessage('Sessão expirada. Inicie sessão novamente.') }, [])
   useEffect(() => {
     let active = true
@@ -59,8 +60,8 @@ export default function App() {
       {checking ? <p role="status">A verificar sessão…</p> : user ? <>
         <h2>Olá, {user.username}</h2><p>{user.groups.map(role => roleNames[role] ?? role).join(' · ')}</p>
         {user.permissions.includes('catalog.manage') && <>
-          <nav aria-label="Cadastros" className="catalog-nav">{(Object.keys(catalogs) as Resource[]).map(key => <button key={key} aria-pressed={resource === key} disabled={busy || catalogBusy} onClick={() => setResource(key)}>{catalogs[key].label}</button>)}{user.permissions.includes('prices.manage') && <button aria-pressed={resource === 'prices'} disabled={busy || catalogBusy} onClick={() => setResource('prices')}>Preços</button>}</nav>
-          {resource === 'prices' ? <Prices key={`${user.id}-prices`} onSessionExpired={sessionExpired} onBusyChange={setCatalogBusy} /> : <Catalog key={`${user.id}-${resource}`} resource={resource} onSessionExpired={sessionExpired} onBusyChange={setCatalogBusy} />}
+          <nav aria-label="Cadastros" className="catalog-nav">{(Object.keys(catalogs) as Resource[]).map(key => <button key={key} aria-pressed={resource === key} disabled={busy || catalogBusy} onClick={() => setResource(key)}>{catalogs[key].label}</button>)}{user.permissions.includes('prices.manage') && <button aria-pressed={resource === 'prices'} disabled={busy || catalogBusy} onClick={() => setResource('prices')}>Preços</button>}{user.permissions.includes('field.manage') && <button aria-pressed={resource === 'work-logs'} disabled={busy || catalogBusy} onClick={() => setResource('work-logs')}>Diário de campo</button>}</nav>
+          {resource === 'work-logs' ? <WorkLogs key={`${user.id}-work-logs`} onSessionExpired={sessionExpired} onBusyChange={setCatalogBusy} /> : resource === 'prices' ? <Prices key={`${user.id}-prices`} onSessionExpired={sessionExpired} onBusyChange={setCatalogBusy} /> : <Catalog key={`${user.id}-${resource}`} resource={resource} onSessionExpired={sessionExpired} onBusyChange={setCatalogBusy} />}
         </>}
         {user.permissions.includes('users.view') && <><button disabled={busy || catalogBusy} onClick={loadUsers}>Consultar utilizadores</button>
           <ul>{users.map(item => <li key={item.id}>{item.username} — {item.groups.map(role => roleNames[role] ?? role).join(', ')}</li>)}</ul></>}

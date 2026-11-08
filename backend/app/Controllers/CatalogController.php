@@ -8,6 +8,7 @@ class CatalogController extends BaseController
 {
     // Only these names may ever select tables or fields.
     private const FIELDS = [
+        'sites' => ['name' => 160, 'client_id' => 'clients', 'locality' => 160, 'notes' => 2000],
         'workers' => ['name' => 160, 'email' => 254, 'phone' => 40, 'notes' => 2000, 'team_id' => 'teams'],
         'teams' => ['name' => 160, 'responsible_name' => 120, 'notes' => 2000],
         'clients' => ['name' => 160, 'contact_name' => 120, 'email' => 254, 'phone' => 40, 'notes' => 2000],
@@ -27,6 +28,11 @@ class CatalogController extends BaseController
             return $this->error(422, 'Filtros inválidos.');
         }
         $builder = db_connect()->table('agri_' . $resource);
+        $referenceField = $resource === 'workers' ? 'team_id' : ($resource === 'sites' ? 'client_id' : null);
+        if ($referenceField && ($reference = $this->request->getGet($referenceField)) !== null) {
+            if (! is_string($reference) || ! ctype_digit($reference) || (int) $reference < 1) { return $this->error(422, 'Filtro de referência inválido.'); }
+            $builder->where($referenceField, (int) $reference);
+        }
         if (trim($query) !== '') {
             $builder->like('name', trim($query));
         }
@@ -167,7 +173,7 @@ class CatalogController extends BaseController
 
     private function normalize(array $row): array
     {
-        foreach (['id', 'version', 'team_id', 'payment_unit_id', 'billing_unit_id'] as $field) {
+        foreach (['id', 'version', 'team_id', 'client_id', 'payment_unit_id', 'billing_unit_id'] as $field) {
             if (isset($row[$field])) { $row[$field] = (int) $row[$field]; }
         }
         $row['is_active'] = (bool) $row['is_active'];
