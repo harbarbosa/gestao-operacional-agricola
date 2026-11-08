@@ -3,7 +3,7 @@
 Aplicação para gerir equipas agrícolas em Portugal, do registo do trabalho no campo ao apuramento de valores a pagar aos trabalhadores e a receber dos clientes.
 
 ## Estado
-Planeamento inicial. Não existe aplicação implementada. Requisitos derivados do documento fornecido pelo responsável do projeto.
+Fundação técnica em desenvolvimento: frontend PWA, rascunho local de demonstração e API de saúde. Autenticação e funcionalidades de negócio ainda não implementadas. Requisitos derivados do documento fornecido pelo responsável do projeto.
 
 ## Documentação
 - [Escopo e regras de negócio](docs/ESCOPO.md)
@@ -17,3 +17,6 @@ Autenticação e permissões; trabalhadores e equipas; clientes e explorações;
 Cada funcionalidade deve partir de uma issue com critérios de aceitação, ser implementada numa branch própria e revista por pull request. A conclusão exige validação dos critérios, testes relevantes e atualização da documentação.
 
 Não publicar credenciais, dados pessoais de trabalhadores, dados reais de clientes ou cópias de bases de dados neste repositório. Usar dados fictícios nos exemplos e testes.
+
+## Executar o projeto
+Consultar [Desenvolvimento local](docs/DESENVOLVIMENTO.md).
