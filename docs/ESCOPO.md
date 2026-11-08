@@ -46,3 +46,19 @@ Aplicações nativas separadas, integração com máquinas, geolocalização, fo
 
 ## Requisitos transversais
 Interface simples; base centralizada; validação no servidor; controlo de acesso; auditoria; proteção de dados; backups automáticos e teste de recuperação; expansão para novas equipas e clientes.
+
+## Definições confirmadas
+- Operação de uma única empresa.
+- Registo offline obrigatório na primeira versão.
+
+## Funcionamento offline proposto (a validar)
+- Preparar o dispositivo com autenticação e sincronização inicial online; offline não significa primeiro acesso sem internet.
+- Disponibilizar previamente apenas cadastros necessários às equipas autorizadas.
+- Guardar rascunhos e alterações localmente, com fila persistente que sobreviva a reinícios.
+- Mostrar estado de cada registo: pendente, sincronizado, conflito ou erro; indicar última sincronização.
+- Sincronizar ao recuperar ligação enquanto a aplicação estiver ativa, com opção manual. Não depender exclusivamente de sincronização em segundo plano.
+- Usar identificadores de operação e controlo de versão para evitar duplicação e detetar edições simultâneas; nunca sobrescrever silenciosamente conflitos.
+- Proposta: validação definitiva, fecho financeiro, pagamentos e recebimentos exigem ligação e validação no servidor. Registos offline são provisórios até sincronizar.
+- Se a sessão expirar, preservar a fila e exigir nova autenticação antes do envio. O servidor revalida permissões, mesmo para registos criados offline.
+- Definir comportamento em troca de utilizador, saída, perda do dispositivo e armazenamento cheio; não eliminar pendências silenciosamente nem expô-las a outro utilizador.
+- Armazenamento local não substitui backup: informar falhas e limitações, incluindo perda de dados se o armazenamento do navegador for apagado antes da sincronização.
