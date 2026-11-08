@@ -33,3 +33,39 @@ jobs:
           coverage: none
       - run: composer install --no-interaction --prefer-dist
       - run: vendor/bin/phpunit tests/app
+
+  mariadb:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: test-password-only
+          MARIADB_DATABASE: agri_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      database.tests.DBDriver: MySQLi
+      database.tests.hostname: 127.0.0.1
+      database.tests.database: agri_test
+      database.tests.username: root
+      database.tests.password: test-password-only
+      database.tests.DBPrefix: test_
+      database.tests.port: 3306
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: intl, mbstring, mysqli, sqlite3
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist
+      - run: vendor/bin/phpunit tests/app
