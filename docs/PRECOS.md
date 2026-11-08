@@ -39,7 +39,7 @@ Todos os endpoints exigem sessão e prices.manage; POST exige CSRF.
 | POST | /api/v1/prices/ID/cancel | Anular; exige version e reason |
 | POST | /api/v1/prices/preview | Selecionar tarifa e simular total |
 
-Criação: service_id inteiro, kind payment/billing, worker_id/client_id opcionais, amount string, valid_from data AAAA-MM-DD e valid_to data ou null. Pagamento não aceita client_id; cobrança não aceita worker_id. Campos desconhecidos são rejeitados.
+Criação: service_id inteiro, kind payment/billing, worker_id/client_id opcionais, amount string, valid_from data AAAA-MM-DD e valid_to data ou null. Pagamento não aceita client_id; cobrança não aceita worker_id. A interface envia também unit_id como expectativa da unidade apresentada. Se a configuração mudar antes de guardar, a API devolve 409, sem criar tarifa; a interface atualiza a unidade e exige reintroduzir o valor. Pela API, omitir unit_id significa aceitar a unidade atual do serviço. Campos desconhecidos são rejeitados.
 
 Simulação: mesmo serviço/finalidade/destinatário, date e quantity string. Não aceita preço fornecido pelo cliente. Sobreposição ou versão antiga gera 409; dados inválidos 422; tarifa não encontrada 404. Em falha de rede, consultar o histórico antes de repetir uma criação, pois ainda não há chave de idempotência para cadastros de tarifas.
 

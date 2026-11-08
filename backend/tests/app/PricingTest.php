@@ -207,6 +207,15 @@ final class PricingTest extends CIUnitTestCase
         $this->assertSame('10.0000', $data['items'][0]['amount']);
     }
 
+    public function testStaleUnitExpectationIsRejectedWithoutCreatingPrice(): void
+    {
+        $this->login();
+        $this->db->table('agri_services')->where('id', $this->serviceId)->update(['payment_unit_id' => $this->boxId]);
+        $this->write('', ['service_id' => $this->serviceId, 'unit_id' => $this->hourId, 'kind' => 'payment', 'amount' => '10', 'valid_from' => '2026-11-01'])->assertStatus(409);
+        $this->assertSame(0, $this->db->table('agri_prices')->countAllResults());
+        $this->assertSame(0, $this->db->table('agri_price_audit')->countAllResults());
+    }
+
     public function testInactiveServicePreventsNewRatesButAllowsClosingHistory(): void
     {
         $this->login(); $price = $this->rate();

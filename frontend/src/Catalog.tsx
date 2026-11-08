@@ -2,7 +2,7 @@ import { useEffect, useState, type SubmitEvent } from 'react'
 import { api, ApiError } from './api'
 import { catalogs, payloadFor, type CatalogItem, type CatalogList, type Field, type Resource } from './catalog'
 
-export function ReferenceField({ field, value, onChange, disabled, emptyLabel = 'Sem equipa' }: { field: Field; value: string; onChange: (value: string) => void; disabled: boolean; emptyLabel?: string }) {
+export function ReferenceField({ field, value, onChange, disabled, emptyLabel = 'Sem equipa', includeInactive = false }: { field: Field; value: string; onChange: (value: string) => void; disabled: boolean; emptyLabel?: string; includeInactive?: boolean }) {
   const [search, setSearch] = useState('')
   const [items, setItems] = useState<CatalogItem[]>([])
   const [selected, setSelected] = useState<CatalogItem | null>(null)
@@ -11,11 +11,11 @@ export function ReferenceField({ field, value, onChange, disabled, emptyLabel = 
     let active = true
     const timer = setTimeout(() => {
       api<CatalogList>(`/catalog/${field.resource}?q=${encodeURIComponent(search)}`)
-        .then(data => { if (active) { setItems(data.items.filter(item => item.is_active)); setError('') } })
+        .then(data => { if (active) { setItems(data.items.filter(item => includeInactive || item.is_active)); setError('') } })
         .catch(() => { if (active) setError('Não foi possível carregar as opções. Verifique a sessão e a ligação.') })
     }, 250)
     return () => { active = false; clearTimeout(timer) }
-  }, [search, field.resource])
+  }, [search, field.resource, includeInactive])
   useEffect(() => {
     let active = true
     if (value) api<{ item: CatalogItem }>(`/catalog/${field.resource}/${value}`)

@@ -81,18 +81,22 @@ class PriceBook
 
     public function create(array $input, int $actor): array
     {
-        self::keys($input, ['service_id', 'kind', 'worker_id', 'client_id', 'amount', 'valid_from', 'valid_to']);
+        self::keys($input, ['service_id', 'unit_id', 'kind', 'worker_id', 'client_id', 'amount', 'valid_from', 'valid_to']);
         $serviceId = self::id($input['service_id'] ?? null, 'service_id');
+        $expectedUnit = array_key_exists('unit_id', $input) ? self::id($input['unit_id'], 'unit_id') : null;
         $scope = $this->scope($input);
         $amount = self::decimal($input['amount'] ?? null, 'amount');
         $from = self::date($input['valid_from'] ?? null, 'valid_from');
         $to = ($input['valid_to'] ?? null) === null ? null : self::date($input['valid_to'], 'valid_to');
         if ($to !== null && $to < $from) { throw new PriceProblem(422, 'O fim não pode anteceder o início.'); }
-        return $this->transaction(function () use ($serviceId, $scope, $amount, $from, $to, $actor) {
+        return $this->transaction(function () use ($serviceId, $scope, $amount, $from, $to, $actor, $expectedUnit) {
             $service = $this->lockService($serviceId);
             if ($scope['worker_id'] !== null) { $this->record('workers', $scope['worker_id'], true); }
             if ($scope['client_id'] !== null) { $this->record('clients', $scope['client_id'], true); }
             $unit = $this->record('units', (int) $service[$scope['kind'] === 'payment' ? 'payment_unit_id' : 'billing_unit_id'], true);
+            if ($expectedUnit !== null && (int) $unit['id'] !== $expectedUnit) {
+                throw new PriceProblem(409, 'A unidade do serviço foi alterada. Confirme a nova unidade e indique novamente o valor.');
+            }
             $overlap = $this->db->table('agri_prices')->where('service_id', $serviceId)
                 ->where($scope)->where('canceled_at', null)->where('valid_from <=', $to ?? '9999-12-31')
                 ->groupStart()->where('valid_to', null)->orWhere('valid_to >=', $from)->groupEnd()->countAllResults();
