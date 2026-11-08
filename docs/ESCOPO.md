@@ -62,3 +62,13 @@ Interface simples; base centralizada; validação no servidor; controlo de acess
 - Se a sessão expirar, preservar a fila e exigir nova autenticação antes do envio. O servidor revalida permissões, mesmo para registos criados offline.
 - Definir comportamento em troca de utilizador, saída, perda do dispositivo e armazenamento cheio; não eliminar pendências silenciosamente nem expô-las a outro utilizador.
 - Armazenamento local não substitui backup: informar falhas e limitações, incluindo perda de dados se o armazenamento do navegador for apagado antes da sincronização.
+
+## Remuneração configurável
+Requisito confirmado: a modalidade varia e deve ser configurável.
+- Permitir configurar por serviço a unidade de pagamento: hora, dia, caixa, árvore, hectare ou outra unidade cadastrada.
+- Manter unidade e preço de remuneração independentes da unidade e preço de cobrança ao cliente.
+- Proposta: cada lançamento identifica serviço, modalidade, unidade, quantidade e preço aplicado. Um trabalhador pode ter vários lançamentos no mesmo dia, sem somar modalidades automaticamente sobre o mesmo trabalho.
+- Guardar a versão da regra e do preço utilizada; alterações de cadastro não recalculam registos fechados.
+- Disponibilizar as regras necessárias no dispositivo antes do uso offline; divergências encontradas na sincronização devem ficar visíveis para validação, sem substituição silenciosa dos valores.
+- Pagamento por produção coletiva exige regra de distribuição explícita antes da implementação.
+- Ainda a validar: preços específicos por trabalhador/função/equipa, proporcionalidade de diárias, pausas, horas extra, mínimos, arredondamento e eventual combinação de modalidades.
