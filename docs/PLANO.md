@@ -5,7 +5,8 @@ Validar regras de remuneração e cobrança, papéis, fecho, duração offline e
 Entrega: decisões documentadas e exemplos de cálculo aprovados.
 
 ## Etapa 1 — Fundação
-Preparar projeto, ambientes, base de dados, migrações, autenticação, permissões, estrutura PWA proposta, armazenamento local, protocolo de sincronização e verificações automáticas.
+Arquitetura aprovada detalhada em [ARQUITETURA.md](ARQUITETURA.md). Preparar frontend React/TypeScript/Vite com Dexie e backend CodeIgniter 4 com MariaDB.
+Preparar projeto, ambientes, base de dados, migrações, autenticação, permissões, estrutura PWA aprovada, armazenamento local, protocolo de sincronização e verificações automáticas.
 Entrega: entrada no sistema com perfis e isolamento de acesso verificados.
 
 ## Etapa 2 — Cadastros
