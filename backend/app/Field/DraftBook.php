@@ -45,7 +45,7 @@ class DraftBook
         $rows = []; $seen = [];
         foreach ($value as $row) {
             if (! is_array($row)) { throw new FieldProblem(422, 'Participante inválido.'); }
-            self::keys($row, ['worker_id', 'present', 'time_in', 'time_out', 'exit_next_day', 'payment_quantity', 'score', 'notes']);
+            self::keys($row, ['worker_id', 'present', 'time_in', 'time_out', 'exit_next_day', 'payment_quantity', 'score', 'notes', 'pool_key']);
             $id = self::id($row['worker_id'] ?? null);
             if (isset($seen[$id])) { throw new FieldProblem(422, 'O mesmo trabalhador não pode aparecer duas vezes no diário.'); }
             $seen[$id] = true;
@@ -61,14 +61,18 @@ class DraftBook
             if (! $present && ($in !== null || $out !== null || $quantity !== null || $score !== null || $nextDay)) { throw new FieldProblem(422, 'Ausência não pode ter horário, quantidade ou avaliação.'); }
             if (($out !== null && $in === null) || ($nextDay && ($in === null || $out === null))) { throw new FieldProblem(422, 'Complete a entrada antes de registar saída ou turno noturno.'); }
             if ($in !== null && $out !== null && ((! $nextDay && $out <= $in) || ($nextDay && $out > $in))) { throw new FieldProblem(422, 'Reveja os horários e a indicação de saída no dia seguinte (máximo 24 horas).'); }
-            $rows[] = ['worker_id' => $id, 'present' => $present, 'time_in' => $in, 'time_out' => $out, 'exit_next_day' => $nextDay, 'payment_quantity' => $quantity, 'score' => $score, 'notes' => self::text($row['notes'] ?? null, 500)];
+            $pool = self::text($row['pool_key'] ?? null,32); if ($pool !== null && (!preg_match('/^[a-zA-Z0-9_-]+$/D',$pool) || !$present || $quantity !== null)) throw new FieldProblem(422,'No trabalho em grupo, registe a produção no grupo, sem quantidade individual.');
+            $rows[] = ['pool_key'=>$pool, 'worker_id' => $id, 'present' => $present, 'time_in' => $in, 'time_out' => $out, 'exit_next_day' => $nextDay, 'payment_quantity' => $quantity, 'score' => $score, 'notes' => self::text($row['notes'] ?? null, 500)];
         }
         usort($rows, static fn ($a, $b) => $a['worker_id'] <=> $b['worker_id']);
         return $rows;
     }
     private function contents(array $data): array
     {
-        return ['notes' => self::text($data['notes'] ?? null, 2000), 'billing_quantity' => self::quantity($data['billing_quantity'] ?? null), 'attendees' => $this->attendees($data['attendees'] ?? null)];
+        if(!is_array($data['pools']??[]) || !array_is_list($data['pools']??[]) || count($data['pools']??[])>50) throw new FieldProblem(422,'Indique até 50 grupos.');
+        $pools=[]; foreach(($data['pools'] ?? []) as $pool) { if (!is_array($pool)) throw new FieldProblem(422,'Grupo inválido.'); self::keys($pool,['pool_key','name','quantity']); $key=self::text($pool['pool_key'] ?? null,32); $name=self::text($pool['name'] ?? null,100); $quantity=self::quantity($pool['quantity'] ?? null); if (!$key || !preg_match('/^[a-zA-Z0-9_-]+$/D',$key) || !$name || $quantity===null || isset($pools[$key])) throw new FieldProblem(422,'Complete nome e produção dos grupos, sem duplicar identificadores.'); $pools[$key]=['pool_key'=>$key,'name'=>$name,'quantity'=>$quantity]; }
+        $attendees=$this->attendees($data['attendees'] ?? null); foreach($attendees as $row) if ($row['pool_key']!==null && !isset($pools[$row['pool_key']])) throw new FieldProblem(422,'Grupo do participante inexistente.');
+        return ['pools'=>array_values($pools), 'notes' => self::text($data['notes'] ?? null, 2000), 'billing_quantity' => self::quantity($data['billing_quantity'] ?? null), 'attendees' => $attendees];
     }
     private function record(string $table, int $id, bool $active = true): array
     {
@@ -90,7 +94,7 @@ class DraftBook
     }
     public function create(array $input, int $actor): array
     {
-        self::keys($input, ['request_id', 'work_date', 'team_id', 'site_id', 'client_id', 'service_id', 'service_version', 'notes', 'billing_quantity', 'attendees']);
+        self::keys($input, ['request_id', 'work_date', 'team_id', 'site_id', 'client_id', 'service_id', 'service_version', 'notes', 'billing_quantity', 'attendees', 'pools']);
         $request = $input['request_id'] ?? null;
         if (! is_string($request) || ! preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $request)) { throw new FieldProblem(422, 'Identificador UUID de envio inválido.'); }
         $data = $this->contents($input) + [
@@ -108,7 +112,7 @@ class DraftBook
             if ((int) $site['client_id'] !== $data['client_id']) { throw new FieldProblem(409, 'O local não pertence ao cliente indicado. Reveja a seleção.'); }
             $client = $this->record('clients', (int) $site['client_id']);
             $rows = $this->validateWorkers($data['attendees'], $data['team_id']);
-            $header = $data; unset($header['attendees'], $header['service_version']);
+            $header = $data; unset($header['attendees'], $header['service_version'], $header['pools']);
             foreach (['payment', 'billing'] as $kind) {
                 $unit = $this->record('units', (int) $service[$kind . '_unit_id']);
                 $header[$kind . '_unit_id'] = (int) $unit['id']; $header[$kind . '_unit_name'] = $unit['name']; $header[$kind . '_unit_code'] = $unit['code'];
@@ -116,7 +120,7 @@ class DraftBook
             $now = gmdate('Y-m-d H:i:s');
             $header += ['request_id' => $request, 'creation_hash' => $hash, 'client_id' => $client['id'], 'team_name' => $team['name'], 'responsible_name' => $team['responsible_name'], 'site_name' => $site['name'], 'client_name' => $client['name'], 'service_name' => $service['name'], 'status' => 'draft', 'version' => 1, 'created_by' => $actor, 'updated_by' => $actor, 'created_at' => $now, 'updated_at' => $now];
             $this->db->table('agri_work_logs')->insert($header); $id = (int) $this->db->insertID();
-            $this->replaceAttendees($id, $rows);
+            $this->replaceAttendees($id, $rows); $this->replacePools($id,$data['pools']);
             $after = $this->get($id); $this->audit($id, $actor, 'create', null, $after);
             return ['item' => $after, 'replayed' => false];
         });
@@ -125,11 +129,16 @@ class DraftBook
     {
         $previous = array_column($old, null, 'worker_id');
         foreach ($rows as &$row) {
-            $worker = $this->record('workers', $row['worker_id'], ! isset($previous[$row['worker_id']]));
-            if (! isset($previous[$row['worker_id']]) && (int) $worker['team_id'] !== $team) { throw new FieldProblem(422, 'Novo participante deve pertencer à equipa selecionada.'); }
+            $worker=$this->lock('agri_workers',$row['worker_id']); if(!$worker || (!isset($previous[$row['worker_id']]) && !$worker['is_active'])) throw new FieldProblem(422,'Trabalhador inexistente ou inativo.');
+            if (! isset($previous[$row['worker_id']]) && (int) $worker['team_id'] !== $team) { $this->db->table('agri_workers')->where('id',$worker['id'])->set('version','version + 1',false)->update(['team_id'=>$team,'updated_at'=>gmdate('Y-m-d H:i:s')]); $after=$this->db->table('agri_workers')->where('id',$worker['id'])->get()->getRowArray(); $this->db->table('agri_catalog_audit')->insert(['resource'=>'workers','record_id'=>$worker['id'],'actor_id'=>auth()->id(),'action'=>'associate','before_json'=>json_encode($worker),'after_json'=>json_encode($after),'created_at'=>gmdate('Y-m-d H:i:s')]); }
             $row['worker_name'] = $previous[$row['worker_id']]['worker_name'] ?? $worker['name'];
         }
         return $rows;
+    }
+    private function replacePools(int $id,array $pools): void
+    {
+        $this->db->table('agri_work_pools')->where('work_log_id',$id)->delete();
+        foreach($pools as $pool) $this->db->table('agri_work_pools')->insert(['work_log_id'=>$id]+$pool);
     }
     private function replaceAttendees(int $id, array $rows): void
     {
@@ -138,7 +147,7 @@ class DraftBook
     }
     public function update(int $id, array $input, int $actor, bool $cancel = false): array
     {
-        self::keys($input, $cancel ? ['version', 'reason'] : ['version', 'notes', 'billing_quantity', 'attendees']);
+        self::keys($input, $cancel ? ['version', 'reason'] : ['version', 'notes', 'billing_quantity', 'attendees', 'pools']);
         $version = self::id($input['version'] ?? null);
         $content = $cancel ? ['cancel_reason' => self::text($input['reason'] ?? null, 500)] : $this->contents($input);
         if ($cancel && mb_strlen($content['cancel_reason'] ?? '') < 3) { throw new FieldProblem(422, 'Indique o motivo do cancelamento (3 a 500 caracteres).'); }
@@ -148,11 +157,11 @@ class DraftBook
             if ($before['version'] !== $version || $before['status'] !== 'draft') { throw new FieldProblem(409, 'O diário foi alterado ou cancelado. Recarregue antes de editar.'); }
             $data = $content;
             if ($cancel) { $data['status'] = 'canceled'; }
-            else { unset($data['attendees']); $rows = $this->validateWorkers($content['attendees'], $before['team_id'], $before['attendees']); }
+            else { unset($data['attendees'], $data['pools']); $rows = $this->validateWorkers($content['attendees'], $before['team_id'], $before['attendees']); }
             $data += ['version' => $version + 1, 'updated_by' => $actor, 'updated_at' => gmdate('Y-m-d H:i:s')];
             $this->db->table('agri_work_logs')->where('id', $id)->where('version', $version)->update($data);
             if ($this->db->affectedRows() !== 1) { throw new FieldProblem(409, 'O diário foi alterado.'); }
-            if (! $cancel) { $this->replaceAttendees($id, $rows); }
+            if (! $cancel) { $this->replaceAttendees($id, $rows); $this->replacePools($id,$content['pools']); }
             $after = $this->get($id); $this->audit($id, $actor, $cancel ? 'cancel' : 'update', $before, $after);
             return ['item' => $after];
         });
@@ -170,6 +179,8 @@ class DraftBook
             $attendee['score'] = $attendee['score'] === null ? null : (int) $attendee['score'];
             $attendee['payment_quantity'] = $attendee['payment_quantity'] === null ? null : PriceBook::decimal((string) $attendee['payment_quantity'], 'quantity');
         }
+        $row['pools'] = $this->db->table('agri_work_pools')->where('work_log_id',$id)->orderBy('pool_key')->get()->getResultArray();
+        $row['earnings'] = $this->db->table('agri_earnings')->where('work_log_id',$id)->orderBy('worker_id')->get()->getResultArray();
         $row['attendees'] = $rows;
         return $row;
     }

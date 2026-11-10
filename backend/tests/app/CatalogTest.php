@@ -169,4 +169,74 @@ final class CatalogTest extends CIUnitTestCase
         $team = $this->create('teams', ['name' => 'Equipa']);
         $this->write('teams', ['name' => 'Equipa'], $team['id'])->assertStatus(422);
     }
+    private function removeRecord(string $resource, int $id, int $version = 1)
+    {
+        $token = csrf_hash();
+        session()->set(config('Security')->tokenName, $token);
+        return $this->withSession()->withHeaders(['X-CSRF-TOKEN' => $token, 'X-Requested-With' => 'XMLHttpRequest'])
+            ->withBodyFormat('json')->delete('/api/v1/catalog/' . $resource . '/' . $id, ['version' => $version]);
+    }
+
+    public function testUnlinkedRecordIsDeletedAndAuditPreserved(): void
+    {
+        $this->login();
+        $client = $this->create('clients', ['name' => 'Sem vínculos']);
+        $result = $this->removeRecord('clients', $client['id']);
+        $result->assertStatus(200);
+        $this->assertSame('deleted', json_decode($result->getJSON(), true)['action']);
+        $this->dontSeeInDatabase('agri_clients', ['id' => $client['id']]);
+        $this->seeInDatabase('agri_catalog_audit', ['resource' => 'clients', 'record_id' => $client['id'], 'action' => 'delete']);
+    }
+
+    public function testIncomingAndOutgoingLinksOnlyDeactivate(): void
+    {
+        $this->login();
+        $team = $this->create('teams', ['name' => 'Com trabalhador']);
+        $worker = $this->create('workers', ['name' => 'Com equipa', 'team_id' => $team['id']]);
+        foreach ([['teams', $team['id']], ['workers', $worker['id']]] as [$resource, $id]) {
+            $result = $this->removeRecord($resource, $id);
+            $result->assertStatus(200);
+            $this->assertSame('deactivated', json_decode($result->getJSON(), true)['action']);
+            $this->seeInDatabase('agri_' . $resource, ['id' => $id, 'is_active' => 0, 'version' => 2]);
+            $this->seeInDatabase('agri_catalog_audit', ['resource' => $resource, 'record_id' => $id, 'action' => 'deactivate']);
+        }
+        $this->seeInDatabase('agri_workers', ['id' => $worker['id'], 'team_id' => $team['id']]);
+    }
+
+    public function testStaleDeleteIsRejectedWithoutRemovingRecord(): void
+    {
+        $this->login();
+        $client = $this->create('clients', ['name' => 'Versão atual']);
+        $this->removeRecord('clients', $client['id'], 2)->assertStatus(409);
+        $this->seeInDatabase('agri_clients', ['id' => $client['id'], 'version' => 1, 'is_active' => 1]);
+        $this->assertSame(0, $this->db->table('agri_catalog_audit')->where('action', 'delete')->countAllResults());
+    }
+
+    public function testDeleteRequiresPermission(): void
+    {
+        $this->removeRecord('clients', 1)->assertStatus(401);
+        $this->login('worker');
+        $this->removeRecord('clients', 1)->assertStatus(403);
+    }
+
+    public function testCanceledTariffStillProtectsWorkerFromDeletion(): void
+    {
+        $this->login();
+        $unit = $this->create('units', ['name' => 'Hora', 'code' => 'hora']);
+        $service = $this->create('services', ['name' => 'Colheita', 'payment_unit_id' => $unit['id'], 'billing_unit_id' => $unit['id']]);
+        $worker = $this->create('workers', ['name' => 'Trabalhador com histórico']);
+        $this->db->table('agri_prices')->insert([
+            'service_id' => $service['id'], 'worker_id' => $worker['id'], 'kind' => 'payment',
+            'unit_id' => $unit['id'], 'unit_name' => 'Hora', 'unit_code' => 'hora',
+            'amount' => '10.0000', 'currency' => 'EUR', 'valid_from' => '2026-11-01',
+            'created_by' => auth()->id(), 'created_at' => '2026-11-01 10:00:00', 'updated_at' => '2026-11-01 10:00:00',
+            'canceled_at' => '2026-11-02 10:00:00', 'cancel_reason' => 'Teste',
+        ]);
+        $result = $this->removeRecord('workers', $worker['id']);
+        $result->assertStatus(200);
+        $this->assertSame('deactivated', json_decode($result->getJSON(), true)['action']);
+        $this->seeInDatabase('agri_workers', ['id' => $worker['id'], 'is_active' => 0]);
+        $this->seeInDatabase('agri_prices', ['worker_id' => $worker['id'], 'amount' => '10.0000']);
+    }
+
 }

@@ -1,7 +1,7 @@
 export type PriceKind = 'payment' | 'billing'
 export interface Price {
   id: number; service_id: number; kind: PriceKind; worker_id: number | null; client_id: number | null
-  worker_name?: string | null; client_name?: string | null
+  service_name?: string; worker_name?: string | null; client_name?: string | null
   amount: string; currency: string; unit_id: number; unit_name: string; unit_code: string
   valid_from: string; valid_to: string | null; version: number; canceled_at: string | null; cancel_reason: string | null
 }
@@ -10,7 +10,7 @@ export interface PricePreview { price: Price; quantity: string; total: string; p
 
 // Nunca converter valores monetários para Number: o servidor calcula com decimais exatos.
 export function canonicalDecimal(value: string): string {
-  const text = value.trim().replace(',', '.')
+  const text = value.trim().replace(/[\s\u00a0\u202f]/g, '').replace(',', '.')
   if (!/^[0-9]{1,8}(\.[0-9]{1,4})?$/.test(text)) throw new Error('Use até 8 algarismos inteiros e 4 casas decimais, sem separador de milhares.')
   const [integer, fraction] = text.split('.')
   return integer.replace(/^0+(?=\d)/, '') + (fraction === undefined ? '' : `.${fraction}`)

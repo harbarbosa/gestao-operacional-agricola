@@ -4,7 +4,7 @@ export type CatalogItem = {
   [key: string]: string | number | boolean | null
 }
 export interface CatalogList { items: CatalogItem[]; page: number; pageSize: number; total: number }
-export interface Field { key: string; label: string; type?: 'email' | 'textarea' | 'reference'; required?: boolean; max?: number; resource?: Resource; query?: string }
+export interface Field { key: string; label: string; type?: 'email' | 'textarea' | 'reference'; required?: boolean; max?: number; resource?: Resource; query?: string; source?: 'reports' | 'field' | 'finance'; lookup?: 'managers' }
 export const catalogs: Record<Resource, { label: string; fields: Field[] }> = {
   sites: { label: 'Locais', fields: [
     { key: 'name', label: 'Nome do local / exploração', required: true, max: 160 },
@@ -20,6 +20,7 @@ export const catalogs: Record<Resource, { label: string; fields: Field[] }> = {
     { key: 'notes', label: 'Observações', type: 'textarea', max: 2000 },
   ] },
   teams: { label: 'Equipas', fields: [
+    { key: 'manager_user_id', label: 'Responsável (utilizador)', type: 'reference', resource: 'teams', source: 'field', lookup: 'managers' },
     { key: 'name', label: 'Nome', required: true, max: 160 },
     { key: 'responsible_name', label: 'Nome do responsável', max: 120 },
     { key: 'notes', label: 'Observações', type: 'textarea', max: 2000 },

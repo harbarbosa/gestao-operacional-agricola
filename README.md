@@ -1,4 +1,4 @@
-# Gestão Operacional Agrícola
+# Agroperi
 
 Aplicação para gerir equipas agrícolas em Portugal, do registo do trabalho no campo ao apuramento de valores a pagar aos trabalhadores e a receber dos clientes.
 
@@ -32,3 +32,6 @@ Consultar [Tarifas, vigências e simulação](docs/PRECOS.md).
 
 ## Diário de campo
 Consultar [Locais e registos de campo](docs/DIARIO_CAMPO.md).
+
+## Produção e pagamentos
+Consultar [Operação Agroperi](docs/AGROPERI_PRODUCAO.md).
