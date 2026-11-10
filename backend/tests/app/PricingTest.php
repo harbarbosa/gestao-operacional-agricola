@@ -223,4 +223,42 @@ final class PricingTest extends CIUnitTestCase
         $this->write('', ['service_id' => $this->serviceId, 'kind' => 'billing', 'amount' => '10', 'valid_from' => '2026-11-01'])->assertStatus(422);
         $this->write('/' . $price['id'] . '/end', ['version' => 1, 'valid_to' => '2026-11-15'])->assertStatus(200);
     }
+    public function testGlobalListIncludesAllServicesWithoutRequiringServiceFilter(): void
+    {
+        $this->login(); $this->rate();
+        $other = $this->fixture('services', ['name' => 'Poda', 'payment_unit_id' => $this->hourId, 'billing_unit_id' => $this->boxId]);
+        $this->rate(['service_id' => $other]);
+        $result = $this->withSession()->get('/api/v1/prices'); $result->assertStatus(200);
+        $data = json_decode($result->getJSON(), true);
+        $this->assertSame(2, $data['total']);
+        $this->assertSame(['Poda', 'Colheita'], array_column($data['items'], 'service_name'));
+        $filtered = $this->withSession()->get('/api/v1/prices?service_id=' . $other); $filtered->assertStatus(200);
+        $this->assertSame(1, json_decode($filtered->getJSON(), true)['total']);
+    }
+
+    public function testFiltersCombineSearchKindAndCancellationState(): void
+    {
+        $this->login(); $payment = $this->rate(['worker_id' => $this->workerId]);
+        $this->rate(['kind' => 'billing', 'client_id' => $this->clientId]);
+        $this->write('/' . $payment['id'] . '/cancel', ['version' => 1, 'reason' => 'Teste de histórico'])->assertStatus(200);
+        foreach ([
+            ['kind=payment&status=canceled&q=Pessoa', 1],
+            ['kind=billing&status=available&q=Cliente', 1],
+            ['kind=billing&status=canceled', 0],
+            ['q=Colheita', 2],
+            ['q=Inexistente', 0],
+        ] as [$query, $total]) {
+            $result = $this->withSession()->get('/api/v1/prices?' . $query); $result->assertStatus(200);
+            $this->assertSame($total, json_decode($result->getJSON(), true)['total']);
+        }
+    }
+
+    public function testInvalidListFiltersAreRejected(): void
+    {
+        $this->login();
+        foreach (['service_id=0', 'service_id[]=1', 'page=0', 'page=100001', 'q[]=x', 'kind=invalid', 'status=invalid'] as $query) {
+            $this->withSession()->get('/api/v1/prices?' . $query)->assertStatus(422);
+        }
+    }
+
 }

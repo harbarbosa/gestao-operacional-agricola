@@ -20,6 +20,14 @@ class ApiSession implements FilterInterface
             return service('response')->setStatusCode(401)->setHeader('Cache-Control', 'no-store')
                 ->setJSON(['error' => 'É necessário iniciar sessão.']);
         }
+        $state = db_connect()->table('agri_user_versions')->where('user_id', $user->id)->get()->getRowArray();
+        $version = (int) ($state['security_version'] ?? 1);
+        $sessionVersion = session()->get('agri_user_security_version');
+        if (($sessionVersion === null && $version > 1) || ($sessionVersion !== null && (int) $sessionVersion !== $version)) {
+            auth('session')->logout();
+            return service('response')->setStatusCode(401)->setHeader('Cache-Control', 'no-store')->setJSON(['error' => 'Os dados de acesso foram alterados. Inicie sessão novamente.']);
+        }
+        session()->set('agri_user_security_version', $version);
         foreach ($arguments ?? [] as $permission) {
             if (! $user->can($permission)) {
                 return service('response')->setStatusCode(403)->setHeader('Cache-Control', 'no-store')

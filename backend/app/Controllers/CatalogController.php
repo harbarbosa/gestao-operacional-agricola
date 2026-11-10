@@ -10,7 +10,7 @@ class CatalogController extends BaseController
     private const FIELDS = [
         'sites' => ['name' => 160, 'client_id' => 'clients', 'locality' => 160, 'notes' => 2000],
         'workers' => ['name' => 160, 'email' => 254, 'phone' => 40, 'notes' => 2000, 'team_id' => 'teams'],
-        'teams' => ['name' => 160, 'responsible_name' => 120, 'notes' => 2000],
+        'teams' => ['manager_user_id' => 'managers', 'name' => 160, 'responsible_name' => 120, 'notes' => 2000],
         'clients' => ['name' => 160, 'contact_name' => 120, 'email' => 254, 'phone' => 40, 'notes' => 2000],
         'units' => ['name' => 160, 'code' => 32],
         'services' => ['name' => 160, 'notes' => 2000, 'payment_unit_id' => 'units', 'billing_unit_id' => 'units'],
@@ -64,6 +64,72 @@ class CatalogController extends BaseController
         return $this->save($resource, (int) $id);
     }
 
+    public function remove(string $resource, string $id)
+    {
+        if (! isset(self::FIELDS[$resource])) { return $this->error(404, 'Cadastro inexistente.'); }
+        $input = $this->request->getJSON(true);
+        if (! is_array($input) || array_keys($input) !== ['version'] || ! is_int($input['version']) || $input['version'] < 1) {
+            return $this->error(422, 'Indique a versão atual do registo.');
+        }
+        $db = db_connect();
+        $table = 'agri_' . $resource;
+        $db->transBegin();
+        try {
+            // O bloqueio e as chaves RESTRICT protegem contra vínculos concorrentes.
+            $sql = 'SELECT * FROM ' . $db->escapeIdentifiers($db->prefixTable($table)) . ' WHERE id = ?' . ($db->getPlatform() === 'MySQLi' ? ' FOR UPDATE' : '');
+            $before = $db->query($sql, [(int) $id])->getRowArray();
+            if (! $before || (int) $before['version'] !== $input['version']) {
+                $db->transRollback();
+                return $this->error($before ? 409 : 404, $before ? 'Este registo foi alterado. Recarregue a listagem.' : 'Registo não encontrado.');
+            }
+            $linked = false;
+            foreach (self::FIELDS as $other => $fields) {
+                foreach ($fields as $field => $target) {
+                    if ($target === $resource && $db->table('agri_' . $other)->where($field, $id)->countAllResults() > 0) { $linked = true; }
+                }
+            }
+            foreach ([
+                'prices' => ['service_id' => 'services', 'worker_id' => 'workers', 'client_id' => 'clients', 'unit_id' => 'units'],
+                'work_logs' => ['team_id' => 'teams', 'site_id' => 'sites', 'service_id' => 'services', 'client_id' => 'clients', 'payment_unit_id' => 'units', 'billing_unit_id' => 'units'],
+                'work_log_attendees' => ['worker_id' => 'workers'],
+            ] as $other => $fields) {
+                foreach ($fields as $field => $target) {
+                    if ($target === $resource && $db->table('agri_' . $other)->where($field, $id)->countAllResults() > 0) { $linked = true; }
+                }
+            }
+            // Ligações configuradas no próprio registo também são preservadas.
+            foreach (self::FIELDS[$resource] as $field => $target) {
+                if (is_string($target) && ! empty($before[$field])) { $linked = true; }
+            }
+            $now = gmdate('Y-m-d H:i:s');
+            if ($linked) {
+                $db->table($table)->where('id', $id)->where('version', $input['version'])->update([
+                    'is_active' => false, 'version' => $input['version'] + 1, 'updated_at' => $now,
+                ]);
+                $after = $db->table($table)->where('id', $id)->get()->getRowArray();
+            } else {
+                $db->table($table)->where('id', $id)->where('version', $input['version'])->delete();
+                $after = null;
+            }
+            $db->table('agri_catalog_audit')->insert([
+                'resource' => $resource, 'record_id' => (int) $id, 'actor_id' => auth()->id(),
+                'action' => $linked ? 'deactivate' : 'delete',
+                'before_json' => json_encode($before, JSON_THROW_ON_ERROR),
+                'after_json' => json_encode($after, JSON_THROW_ON_ERROR), 'created_at' => $now,
+            ]);
+            if (! $db->transStatus()) { throw new DatabaseException('Falha ao remover cadastro.'); }
+            $db->transCommit();
+            return $this->response->setJSON([
+                'action' => $linked ? 'deactivated' : 'deleted',
+                'message' => $linked ? 'Registo desativado por possuir vínculos. O histórico foi preservado.' : 'Registo excluído.',
+            ]);
+        } catch (DatabaseException $exception) {
+            $db->transRollback();
+            log_message('error', 'Falha ao remover cadastro {resource}.', ['resource' => $resource]);
+            return $this->error(409, 'Não foi possível remover. Recarregue a listagem e tente novamente.');
+        }
+    }
+
     private function save(string $resource, ?int $id = null)
     {
         if (! isset(self::FIELDS[$resource])) {
@@ -105,7 +171,7 @@ class CatalogController extends BaseController
                 $data[$field] = $value === '' ? null : $value;
                 continue;
             }
-            if ($value === null && $field === 'team_id') {
+            if ($value === null && in_array($field, ['team_id', 'manager_user_id'], true)) {
                 $data[$field] = null;
                 continue;
             }
@@ -113,7 +179,8 @@ class CatalogController extends BaseController
                 $errors[$field] = 'Selecione um registo válido.';
                 continue;
             }
-            $related = $db->table('agri_' . $rule)->where('id', $value)->get()->getRowArray();
+            $related = $rule === 'managers' ? $db->table(config('Auth')->tables['users'])->where('id', $value)->get()->getRowArray() : $db->table('agri_' . $rule)->where('id', $value)->get()->getRowArray();
+            if ($related && $rule === 'managers') { $related['is_active'] = $related['active']; $manager = auth()->getProvider()->findById($value); if (!$manager || (!$manager->can('field.record') && !$manager->can('field.manage')) || $manager->isBanned()) $related = null; }
             if (! $related || (! $related['is_active'] && (int) ($before[$field] ?? 0) !== $value)) {
                 $errors[$field] = 'O registo selecionado não existe ou está inativo.';
             }
@@ -173,7 +240,7 @@ class CatalogController extends BaseController
 
     private function normalize(array $row): array
     {
-        foreach (['id', 'version', 'team_id', 'client_id', 'payment_unit_id', 'billing_unit_id'] as $field) {
+        foreach (['id', 'version', 'team_id', 'client_id', 'payment_unit_id', 'billing_unit_id', 'manager_user_id'] as $field) {
             if (isset($row[$field])) { $row[$field] = (int) $row[$field]; }
         }
         $row['is_active'] = (bool) $row['is_active'];

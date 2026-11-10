@@ -14,7 +14,7 @@ final class AuthTest extends CIUnitTestCase
     use DatabaseTestTrait;
     use FeatureTestTrait;
 
-    protected $namespace = '\\CodeIgniter\\Shield';
+    protected $namespace = null;
 
     protected function setUp(): void
     {

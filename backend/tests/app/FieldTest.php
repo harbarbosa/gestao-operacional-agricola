@@ -65,9 +65,9 @@ final class FieldTest extends CIUnitTestCase
     {
         $this->get('/api/v1/work-logs')->assertStatus(401); $this->write('', $this->body())->assertStatus(401);
     }
-    public function testSupervisorHasNoGlobalDraftAccessYet(): void
+    public function testSupervisorWithoutTeamCannotAccessOtherTeams(): void
     {
-        $this->login('supervisor'); $this->withSession()->get('/api/v1/work-logs')->assertStatus(403); $this->write('', $this->body())->assertStatus(403);
+        $this->login('supervisor'); $list=$this->withSession()->get('/api/v1/work-logs'); $list->assertStatus(200); $this->assertSame(0,json_decode($list->getJSON(),true)['total']); $this->write('', $this->body())->assertStatus(403);
     }
     public function testWorkerCannotWriteOrReadCompanyDrafts(): void
     {
@@ -150,13 +150,13 @@ final class FieldTest extends CIUnitTestCase
         $this->write('', $this->body(['request_id' => 'invalido']))->assertStatus(422);
         $this->assertSame(0, $this->db->table('agri_work_log_audit')->countAllResults());
     }
-    public function testWrongTeamParticipantRejectedWithoutPartialReplacement(): void
+    public function testDynamicParticipantIsAssociatedToTheWorkTeam(): void
     {
         $this->login(); $item = $this->create();
         $otherTeam = $this->fixture('teams', ['name' => 'Outra Equipa']); $other = $this->fixture('workers', ['name' => 'Outra Pessoa', 'team_id' => $otherTeam]);
-        $this->write('/' . $item['id'], $this->edit($item, ['attendees' => [['worker_id' => $other]]]), true)->assertStatus(422);
-        $this->seeInDatabase('agri_work_log_attendees', ['work_log_id' => $item['id'], 'worker_id' => $this->workerId]);
-        $this->assertSame(1, $this->db->table('agri_work_log_audit')->countAllResults());
+        $this->write('/' . $item['id'], $this->edit($item, ['attendees' => [['worker_id' => $other]]]), true)->assertStatus(200);
+        $this->seeInDatabase('agri_work_log_attendees', ['work_log_id' => $item['id'], 'worker_id' => $other]); $this->seeInDatabase('agri_workers',['id'=>$other,'team_id'=>$this->teamId]);
+        $this->assertSame(2, $this->db->table('agri_work_log_audit')->countAllResults());
     }
     public function testExistingParticipantAndUnitSnapshotsSurviveCatalogChanges(): void
     {

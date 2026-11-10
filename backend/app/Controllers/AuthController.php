@@ -41,6 +41,8 @@ class AuthController extends BaseController
             return $this->response->setStatusCode(401)->setJSON(['error' => 'Credenciais inválidas ou conta indisponível.']);
         }
         session()->regenerate(true);
+        $state = db_connect()->table('agri_user_versions')->where('user_id', $user->id)->get()->getRowArray();
+        session()->set('agri_user_security_version', (int) ($state['security_version'] ?? 1));
         return $this->me();
     }
 
