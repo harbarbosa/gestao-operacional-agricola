@@ -9,7 +9,7 @@ test('unidades de pagamento e cobrança são independentes e não recebe campos 
 
 test('trabalhador pode ficar sem equipa e desativação usa booleano', () => {
   const data = payloadFor('workers', { name: 'Exemplo', team_id: '' }, false)
-  expect(data.team_id).toBeNull()
+  expect(data).not.toHaveProperty('team_id')
   expect(data.is_active).toBe(false)
   expect(data).not.toHaveProperty('version')
 })

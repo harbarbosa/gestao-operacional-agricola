@@ -35,3 +35,6 @@ Consultar [Locais e registos de campo](docs/DIARIO_CAMPO.md).
 
 ## Produção e pagamentos
 Consultar [Operação Agroperi](docs/AGROPERI_PRODUCAO.md).
+
+## Contratos e colheitas
+Consultar [Operação diária, entregas e fluxo financeiro](docs/COLHEITAS.md).

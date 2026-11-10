@@ -20,7 +20,11 @@ class ProductionController extends BaseController
     {
         $pending=db_connect()->table('agri_earnings e')->select('COALESCE(SUM(e.amount_cents),0) AS total',false)->join('agri_settlement_items i','i.earning_id=e.id','left')->where('i.earning_id',null)->get()->getRowArray();
         $closed=db_connect()->table('agri_settlements')->select('COALESCE(SUM(total_cents-paid_cents),0) AS pending, COALESCE(SUM(paid_cents),0) AS paid',false)->get()->getRowArray();
-        return $this->response->setJSON(['pending_cents'=>(string)\Brick\Math\BigInteger::of((string)$pending['total'])->plus((string)$closed['pending']),'paid_cents'=>(string)$closed['paid']]);
+        $db=db_connect();
+        $harvest=$db->table('agri_harvest_allocations')->selectSum('amount_cents','total')->get()->getRowArray()['total']??0;
+        $moves=$db->table('agri_harvest_movements')->select('kind,SUM(amount_cents) AS total')->groupBy('kind')->get()->getResultArray();$totals=['payment'=>0,'receipt'=>0,'expense'=>0];foreach($moves as $m)$totals[$m['kind']]=(int)$m['total'];
+        $billed=$db->table('agri_harvest_deliveries d')->select('d.billing_quantity,h.billing_rate')->join('agri_harvests h','h.id=d.harvest_id')->get()->getResultArray();$receivable=0;foreach($billed as$d)$receivable+=ProductionBook::cents((string)\Brick\Math\BigDecimal::of($d['billing_quantity'])->multipliedBy($d['billing_rate']));
+        return $this->response->setJSON(['pending_cents'=>(string)\Brick\Math\BigInteger::of((string)$pending['total'])->plus((string)$closed['pending'])->plus((string)$harvest)->minus($totals['payment']), 'paid_cents'=>(string)\Brick\Math\BigInteger::of((string)$closed['paid'])->plus($totals['payment']), 'receivable_cents'=>$receivable-$totals['receipt'],'received_cents'=>$totals['receipt'],'cash_cents'=>$totals['receipt']-$totals['payment']-$totals['expense']]);
     }
     public function index()
     {

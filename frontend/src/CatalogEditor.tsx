@@ -38,13 +38,13 @@ export default function CatalogEditor({ resource, item, initialValues = {}, quic
   return <Modal title={item ? `Editar: ${item.name}` : `${quick ? 'Cadastro rápido' : 'Novo registo'} · ${config.label}`} busy={busy} onClose={onClose}>
     <form onSubmit={save} className="record-form">
       <p role="status" aria-live="polite">{message}</p>
-      {config.fields.map(field => {
+      {config.fields.filter(field => !(quick && endpoint === '/field/workers') || ['name','phone'].includes(field.key)).map(field => {
         const id = `${prefix}-${field.key}`
         return <div className="form-field" key={field.key}>
           <label htmlFor={id}>{field.label}{field.required ? ' *' : ''}</label>
           {field.type === 'reference' ? <ReferenceField field={{ ...field, key: id, ...(endpoint === '/field/workers' && field.type === 'reference' ? { source: 'field' as const } : {}) }} value={values[field.key] ?? ''} disabled={busy || lockedFields.includes(field.key)} onChange={value => setValues(old => ({ ...old, [field.key]: value }))} />
             : field.type === 'textarea' ? <textarea id={id} value={values[field.key] ?? ''} maxLength={field.max} disabled={busy} onChange={e => setValues(old => ({ ...old, [field.key]: field.key === 'phone' ? maskPhone(e.target.value) : e.target.value }))} />
-            : <input id={id} type={field.key === 'phone' ? 'tel' : field.type ?? 'text'} placeholder={field.key === 'phone' ? '+351 912 345 678' : undefined} required={field.required} maxLength={field.max} value={values[field.key] ?? ''} disabled={busy} onChange={e => setValues(old => ({ ...old, [field.key]: field.key === 'phone' ? maskPhone(e.target.value) : e.target.value }))} />}
+            : <input id={id} type={field.key === 'phone' ? 'tel' : field.type ?? 'text'} placeholder={field.key === 'phone' ? '+351 912 345 678' : undefined} required={field.required || (quick && endpoint === '/field/workers' && field.key === 'phone')} maxLength={field.max} value={values[field.key] ?? ''} disabled={busy} onChange={e => setValues(old => ({ ...old, [field.key]: field.key === 'phone' ? maskPhone(e.target.value) : e.target.value }))} />}
           {errors[field.key] && <small role="alert">{errors[field.key]}</small>}
         </div>
       })}

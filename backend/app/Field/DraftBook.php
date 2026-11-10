@@ -94,13 +94,15 @@ class DraftBook
     }
     public function create(array $input, int $actor): array
     {
-        self::keys($input, ['request_id', 'work_date', 'team_id', 'site_id', 'client_id', 'service_id', 'service_version', 'notes', 'billing_quantity', 'attendees', 'pools']);
+        if (!empty($input['harvest_id'])) $input=(new \App\Harvest\HarvestBook($this->db))->activityInput($input);
+        self::keys($input, ['harvest_id', 'controller_id', 'request_id', 'work_date', 'team_id', 'site_id', 'client_id', 'service_id', 'service_version', 'notes', 'billing_quantity', 'attendees', 'pools']);
         $request = $input['request_id'] ?? null;
         if (! is_string($request) || ! preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $request)) { throw new FieldProblem(422, 'Identificador UUID de envio inválido.'); }
         $data = $this->contents($input) + [
-            'work_date' => self::date($input['work_date'] ?? null), 'team_id' => self::id($input['team_id'] ?? null),
+            'work_date' => self::date($input['work_date'] ?? null), 'team_id' => !empty($input['harvest_id']) ? null : self::id($input['team_id'] ?? null),
             'site_id' => self::id($input['site_id'] ?? null), 'client_id' => self::id($input['client_id'] ?? null), 'service_id' => self::id($input['service_id'] ?? null), 'service_version' => self::id($input['service_version'] ?? null),
         ];
+        if (!empty($input['harvest_id'])) $data += ['harvest_id'=>(int)$input['harvest_id'],'controller_id'=>(int)$input['controller_id']];
         $hash = hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
         if ($existing = $this->replay($request, $hash, $actor)) { return $existing; }
         return $this->transaction(function () use ($data, $request, $hash, $actor) {
@@ -108,13 +110,14 @@ class DraftBook
             if ($existing = $this->replay($request, $hash, $actor)) { return $existing; }
             if (! $service || ! $service['is_active']) { throw new FieldProblem(422, 'Serviço inexistente ou inativo.'); }
             if ((int) $service['version'] !== $data['service_version']) { throw new FieldProblem(409, 'O serviço foi alterado. Confirme as unidades e as quantidades antes de voltar a enviar.'); }
-            $team = $this->record('teams', $data['team_id']); $site = $this->record('sites', $data['site_id']);
+            $team = $data['team_id'] ? $this->record('teams', $data['team_id']) : ['name'=>'Atividade diária','responsible_name'=>auth()->getProvider()->findById($data['controller_id'])->username]; $site = $this->record('sites', $data['site_id']);
             if ((int) $site['client_id'] !== $data['client_id']) { throw new FieldProblem(409, 'O local não pertence ao cliente indicado. Reveja a seleção.'); }
             $client = $this->record('clients', (int) $site['client_id']);
             $rows = $this->validateWorkers($data['attendees'], $data['team_id']);
             $header = $data; unset($header['attendees'], $header['service_version'], $header['pools']);
             foreach (['payment', 'billing'] as $kind) {
-                $unit = $this->record('units', (int) $service[$kind . '_unit_id']);
+                $unitId=!empty($data['harvest_id']) ? $this->db->table('agri_harvests')->where('id',$data['harvest_id'])->get()->getRowArray()[$kind.'_unit_id'] : $service[$kind.'_unit_id'];
+                $unit = $this->record('units', (int)$unitId);
                 $header[$kind . '_unit_id'] = (int) $unit['id']; $header[$kind . '_unit_name'] = $unit['name']; $header[$kind . '_unit_code'] = $unit['code'];
             }
             $now = gmdate('Y-m-d H:i:s');
@@ -125,12 +128,12 @@ class DraftBook
             return ['item' => $after, 'replayed' => false];
         });
     }
-    private function validateWorkers(array $rows, int $team, array $old = []): array
+    private function validateWorkers(array $rows, ?int $team, array $old = []): array
     {
         $previous = array_column($old, null, 'worker_id');
         foreach ($rows as &$row) {
             $worker=$this->lock('agri_workers',$row['worker_id']); if(!$worker || (!isset($previous[$row['worker_id']]) && !$worker['is_active'])) throw new FieldProblem(422,'Trabalhador inexistente ou inativo.');
-            if (! isset($previous[$row['worker_id']]) && (int) $worker['team_id'] !== $team) { $this->db->table('agri_workers')->where('id',$worker['id'])->set('version','version + 1',false)->update(['team_id'=>$team,'updated_at'=>gmdate('Y-m-d H:i:s')]); $after=$this->db->table('agri_workers')->where('id',$worker['id'])->get()->getRowArray(); $this->db->table('agri_catalog_audit')->insert(['resource'=>'workers','record_id'=>$worker['id'],'actor_id'=>auth()->id(),'action'=>'associate','before_json'=>json_encode($worker),'after_json'=>json_encode($after),'created_at'=>gmdate('Y-m-d H:i:s')]); }
+            if ($team !== null && ! isset($previous[$row['worker_id']]) && (int) $worker['team_id'] !== $team) { $this->db->table('agri_workers')->where('id',$worker['id'])->set('version','version + 1',false)->update(['team_id'=>$team,'updated_at'=>gmdate('Y-m-d H:i:s')]); $after=$this->db->table('agri_workers')->where('id',$worker['id'])->get()->getRowArray(); $this->db->table('agri_catalog_audit')->insert(['resource'=>'workers','record_id'=>$worker['id'],'actor_id'=>auth()->id(),'action'=>'associate','before_json'=>json_encode($worker),'after_json'=>json_encode($after),'created_at'=>gmdate('Y-m-d H:i:s')]); }
             $row['worker_name'] = $previous[$row['worker_id']]['worker_name'] ?? $worker['name'];
         }
         return $rows;
@@ -154,6 +157,7 @@ class DraftBook
         return $this->transaction(function () use ($id, $input, $content, $version, $actor, $cancel) {
             if (! $this->lock('agri_work_logs', $id)) { throw new FieldProblem(404, 'Diário não encontrado.'); }
             $before = $this->get($id);
+            if (!empty($before['harvest_id'])) { $h=(new \App\Harvest\HarvestBook($this->db))->access((int)$before['harvest_id']); if($h['status']!=='active')throw new FieldProblem(409,'Colheita encerrada.'); }
             if ($before['version'] !== $version || $before['status'] !== 'draft') { throw new FieldProblem(409, 'O diário foi alterado ou cancelado. Recarregue antes de editar.'); }
             $data = $content;
             if ($cancel) { $data['status'] = 'canceled'; }
@@ -187,7 +191,7 @@ class DraftBook
     public function normalize(array $row): array
     {
         unset($row['creation_hash']);
-        foreach (['id', 'team_id', 'site_id', 'client_id', 'service_id', 'payment_unit_id', 'billing_unit_id', 'version', 'created_by', 'updated_by'] as $key) { $row[$key] = (int) $row[$key]; }
+        foreach (['id', 'team_id', 'site_id', 'client_id', 'service_id', 'payment_unit_id', 'billing_unit_id', 'version', 'created_by', 'updated_by'] as $key) { $row[$key] = $row[$key]===null ? null : (int) $row[$key]; }
         $row['billing_quantity'] = $row['billing_quantity'] === null ? null : PriceBook::decimal((string) $row['billing_quantity'], 'quantity');
         return $row;
     }

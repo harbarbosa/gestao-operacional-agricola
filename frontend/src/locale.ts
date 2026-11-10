@@ -36,5 +36,5 @@ export function maskPhone(value: string) {
   return `+351 ${local.replace(/(\d{3})(?=\d)/g, '$1 ').trim()}`.trimEnd()
 }
 
-export function formatCents(value: string | number) { const text = String(value).padStart(3, '0'); return formatCurrency(text.slice(0, -2) + '.' + text.slice(-2)) }
-export function statusLabel(status: string) { return ({draft:'Rascunho',canceled:'Cancelado',closed:'Fechado'} as Record<string,string>)[status] ?? status }
+export function formatCents(value: string | number) { const negative = String(value).startsWith('-'); const text = String(value).replace('-', '').padStart(3, '0'); return formatCurrency((negative ? '-' : '') + text.slice(0, -2) + '.' + text.slice(-2)) }
+export function statusLabel(status: string) { return ({draft:'Rascunho',canceled:'Cancelado',closed:'Validado',submitted:'Por validar'} as Record<string,string>)[status] ?? status }

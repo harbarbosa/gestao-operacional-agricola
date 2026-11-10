@@ -66,10 +66,10 @@ final class ProductionTest extends CIUnitTestCase
         try{$book->settle($input,$this->actor);$this->fail('Rascunhos ignorados');}catch(FieldProblem $e){$this->assertSame(409,$e->status);}
         $this->assertSame(0,$this->db->table('agri_settlements')->countAllResults());
     }
-    public function testSupervisorCreatesWorkersOnlyForAssignedTeamAndCannotAccessForeignActivity(): void
+    public function testSupervisorCreatesWorkersWithoutFixedTeamAndCannotAccessForeignLegacyActivity(): void
     {
         $log=$this->activity();$provider=auth()->getProvider();$provider->save(new User(['username'=>'controller','email'=>'controller@example.test','password'=>'Password123!','active'=>true]));$user=$provider->findById($provider->getInsertID());$user->addGroup('supervisor');$this->db->table('agri_teams')->where('id',$this->team)->update(['manager_user_id'=>$user->id]);auth('session')->logout();auth('session')->login($user);
-        $this->request('/field/workers',['name'=>'Novo trabalhador','team_id'=>$this->team])->assertStatus(201);$this->request('/field/workers',['name'=>'Outro','team_id'=>$this->otherTeam])->assertStatus(403);
+        $this->request('/field/workers',['name'=>'Novo trabalhador','phone'=>'+351 912 345 678'])->assertStatus(201);$this->request('/field/workers',['name'=>'Outro sem telefone'])->assertStatus(422);
         $list=$this->withSession()->get('/api/v1/work-logs');$list->assertStatus(200);$this->assertSame(1,json_decode($list->getJSON(),true)['total']);
         $this->db->table('agri_work_logs')->where('id',$log['id'])->update(['team_id'=>$this->otherTeam]);$this->withSession()->get('/api/v1/work-logs/'.$log['id'])->assertStatus(403);$this->request('/work-logs/'.$log['id'].'/close',['version'=>1,'preview_hash'=>str_repeat('0',64)])->assertStatus(403);
         $this->request('/settlements',[])->assertStatus(403);
