@@ -1,0 +1,17 @@
+// @vitest-environment happy-dom
+import {act,useState} from 'react'
+import {createRoot,type Root} from 'react-dom/client'
+import {afterEach,beforeEach,expect,it,vi} from 'vitest'
+import Participants from './Participants'
+import type {AttendeeForm} from './field'
+vi.mock('./api',()=>({api:vi.fn().mockResolvedValue({item:{name:'Ana'}})}))
+vi.mock('./Catalog',()=>({ReferenceField:({value,onChange,field}:{value:string;onChange:(v:string)=>void;field:{key:string}})=><select id={field.key} required value={value} onChange={e=>onChange(e.target.value)}><option value="">Selecionar</option><option value="1">Ana</option><option value="2">Pedro</option></select>}))
+const initial:AttendeeForm[]=[{key:'a',worker:'1',present:true,timeIn:'08:00',timeOut:'17:00',nextDay:false,quantity:'12',score:'4',notes:'Bom trabalho'},{key:'b',worker:'2',present:true,timeIn:'',timeOut:'',nextDay:false,quantity:'10',score:'',notes:''}]
+let root:Root;let host:HTMLDivElement
+function Harness(){const [rows,setRows]=useState(initial);return <form onSubmit={e=>{e.preventDefault();throw Error('Submissão indevida do diário')}}><Participants rows={rows} onChange={setRows} pools={[]} unit="caixas" disabled={false} canAdd initialNames={{1:'Ana',2:'Pedro'}}/></form>}
+beforeEach(async()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});HTMLDialogElement.prototype.showModal=function(){this.open=true};HTMLDialogElement.prototype.close=function(){this.open=false};host=document.createElement('div');document.body.append(host);root=createRoot(host);await act(async()=>root.render(<Harness/>))})
+afterEach(async()=>{await act(async()=>root.unmount());host.remove()})
+async function click(text:string){await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent===text)!.click())}
+it('mantém os trabalhadores compactos e abre só o formulário selecionado',async()=>{expect(host.querySelectorAll('[role="listitem"]')).toHaveLength(2);expect(document.querySelector('dialog')).toBeNull();expect(host.querySelector('textarea')).toBeNull();await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="Abrir trabalhador Ana"]')!.click());expect(document.querySelectorAll('dialog')).toHaveLength(1);expect(document.querySelector('textarea')!.value).toBe('Bom trabalho');await click('Confirmar participante');expect(document.querySelector('dialog')).toBeNull();expect(host.textContent).toContain('12 caixas')})
+it('cancelar edição não altera os dados nem adiciona um participante vazio',async()=>{await click('Adicionar participante');expect(document.querySelector('dialog')).not.toBeNull();await click('Cancelar');expect(host.querySelectorAll('[role="listitem"]')).toHaveLength(2);expect(document.querySelector('dialog')).toBeNull()})
+it('remover participante atualiza a lista',async()=>{await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="Remover trabalhador Ana"]')!.click());expect(host.querySelectorAll('[role="listitem"]')).toHaveLength(1);expect(host.textContent).not.toContain('Ana')})

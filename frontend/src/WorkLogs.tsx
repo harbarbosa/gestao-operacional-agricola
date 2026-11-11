@@ -5,7 +5,7 @@ import type {Harvest} from './Harvests'
 import ProductionPhotos from './ProductionPhotos'
 import { formatDate, formatTime, formatNumber, maskDecimal, formatCents, statusLabel } from './locale'
 import { Icon } from './Icons'
-import { ReferenceField } from './Catalog'
+import Participants from './Participants'
 import { attendeePayload, type AttendeeForm, type WorkLog, type WorkLogList } from './field'
 import { canonicalDecimal } from './pricing'
 
@@ -25,12 +25,11 @@ function DraftForm({ item, onSaved, onCancel, onSessionExpired, onBusyChange }: 
   const [billing, setBilling] = useState(item?.billing_quantity ? maskDecimal(item.billing_quantity) : '')
   const [pools, setPools] = useState<{pool_key:string;name:string;quantity:string}[]>(item?.pools ?? [])
   const [rows, setRows] = useState<AttendeeForm[]>(() => item?.attendees.map(row => ({ key: crypto.randomUUID(), poolKey: row.pool_key ?? '', worker: String(row.worker_id), present: row.present, timeIn: row.time_in ?? '', timeOut: row.time_out ?? '', nextDay: row.exit_next_day, quantity: row.payment_quantity ? maskDecimal(row.payment_quantity) : '', score: String(row.score ?? ''), notes: row.notes ?? '' })) ?? [])
+  const [participantNames] = useState<Record<string,string>>(()=>Object.fromEntries(item?.attendees.map(row=>[String(row.worker_id),row.worker_name])??[]))
   const [context, setContext] = useState<UnitContext | null>(item ? { version: 0, payment: item.payment_unit_name, billing: item.billing_unit_name } : null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   useEffect(() => { if(!item) api<{items:Harvest[]}>('/harvests').then(r=>setHarvests(r.items.filter(h=>h.status==='active'))).catch(()=>setMessage('Não foi possível carregar colheitas.')) },[item])
-  function updateRow(key: string, changes: Partial<AttendeeForm>) { setRows(old => old.map(row => row.key === key ? { ...row, ...changes } : row)) }
-  function addRow() { setRows(old => [...old, { key: crypto.randomUUID(), worker: '', present: true, timeIn: '', timeOut: '', nextDay: false, quantity: '', score: '', notes: '' }]) }
   async function save(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); onBusyChange(true); setMessage('')
     try {
@@ -56,17 +55,7 @@ function DraftForm({ item, onSaved, onCancel, onSessionExpired, onBusyChange }: 
     {pools.map(pool => <fieldset key={pool.pool_key} disabled={busy}><legend>{pool.name}</legend><label htmlFor={`pool-name-${pool.pool_key}`}>Nome do grupo</label><input id={`pool-name-${pool.pool_key}`} required maxLength={100} value={pool.name} onChange={event => setPools(old => old.map(p => p.pool_key === pool.pool_key ? {...p,name:event.target.value} : p))} /><label htmlFor={`pool-qty-${pool.pool_key}`}>Produção conjunta ({context?.payment ?? 'unidade'})</label><input id={`pool-qty-${pool.pool_key}`} required inputMode="decimal" value={pool.quantity} onChange={event => setPools(old => old.map(p => p.pool_key === pool.pool_key ? {...p,quantity:maskDecimal(event.target.value)} : p))} /><button type="button" onClick={() => { setPools(old=>old.filter(p=>p.pool_key!==pool.pool_key)); setRows(old=>old.map(r=>r.poolKey===pool.pool_key?{...r,poolKey:''}:r)) }}>Remover grupo</button></fieldset>)}
     <button type="button" disabled={busy || pools.length >= 50} onClick={() => setPools(old=>[...old,{pool_key:crypto.randomUUID().replaceAll('-','').slice(0,16),name:`Grupo ${old.length+1}`,quantity:''}])}>Adicionar grupo de divisão igual</button>
     <h3>Participantes</h3>
-    {rows.map((row, index) => <fieldset key={row.key} disabled={busy}><legend>Participante {index + 1}</legend>
-      <label htmlFor={`worker-${row.key}`}>Trabalhador</label><ReferenceField field={{ key: `worker-${row.key}`, label: 'Trabalhador', resource: 'workers', source: 'field', required: true }} value={row.worker} onChange={value => updateRow(row.key, { worker: value })} disabled={busy} />
-      <label className="checkbox"><input type="checkbox" checked={row.present} onChange={e => updateRow(row.key, { present: e.target.checked, ...(!e.target.checked ? { timeIn: '', timeOut: '', nextDay: false, quantity: '', score: '', poolKey: '' } : {}) })} />Presente</label>
-      <div className="field-grid"><div><label htmlFor={`in-${row.key}`}>Entrada</label><input id={`in-${row.key}`} type="time" lang="pt-PT" value={row.timeIn} disabled={!row.present} onChange={e => updateRow(row.key, { timeIn: e.target.value })} /></div><div><label htmlFor={`out-${row.key}`}>Saída</label><input id={`out-${row.key}`} type="time" lang="pt-PT" value={row.timeOut} disabled={!row.present} onChange={e => updateRow(row.key, { timeOut: e.target.value })} /></div></div>
-      <label className="checkbox"><input type="checkbox" checked={row.nextDay} disabled={!row.present} onChange={e => updateRow(row.key, { nextDay: e.target.checked })} />Saída no dia seguinte</label>
-      {pools.length > 0 && <><label htmlFor={`group-${row.key}`}>Grupo de produção</label><select id={`group-${row.key}`} value={row.poolKey ?? ''} disabled={!row.present} onChange={event => updateRow(row.key,{poolKey:event.target.value,quantity:''})}><option value="">Produção individual</option>{pools.map(pool=><option key={pool.pool_key} value={pool.pool_key}>{pool.name} · divisão igual</option>)}</select></>}
-      <label htmlFor={`quantity-${row.key}`}>Quantidade ({context?.payment ?? 'unidade a confirmar'})</label><input id={`quantity-${row.key}`} inputMode="decimal" maxLength={20} value={row.quantity} disabled={!row.present || !context || !!row.poolKey} onChange={e => updateRow(row.key, { quantity: maskDecimal(e.target.value) })} />
-      <label htmlFor={`score-${row.key}`}>Nota de desempenho (1 a 5)</label><select id={`score-${row.key}`} value={row.score} disabled={!row.present} onChange={e => updateRow(row.key, { score: e.target.value })}><option value="">A avaliar</option>{[1, 2, 3, 4, 5].map(score => <option key={score} value={score}>{score}</option>)}</select>
-      <label htmlFor={`notes-${row.key}`}>Observações individuais</label><textarea id={`notes-${row.key}`} maxLength={500} value={row.notes} onChange={e => updateRow(row.key, { notes: e.target.value })} /><button type="button" onClick={() => setRows(old => old.filter(item => item.key !== row.key))}>Remover participante</button>
-    </fieldset>)}
-    <button type="button" disabled={busy || (!item && !harvest) || rows.length >= 100} onClick={addRow}>Adicionar participante</button>
+    <Participants rows={rows} onChange={setRows} pools={pools} unit={context?.payment ?? 'unidade'} disabled={busy} canAdd={!!item || !!harvest} initialNames={participantNames}/>
     <label htmlFor="work-billing">Quantidade total para o cliente ({context?.billing ?? 'unidade a confirmar'})</label><input id="work-billing" inputMode="decimal" maxLength={20} value={billing} disabled={busy || !context} onChange={e => setBilling(maskDecimal(e.target.value))} />
     <label htmlFor="work-notes">Observações do diário</label><textarea id="work-notes" maxLength={2000} disabled={busy} value={notes} onChange={e => setNotes(e.target.value)} />
     <p role="status" aria-live="polite">{message}</p><div className="actions"><button disabled={busy || !context}>{busy ? 'A guardar…' : 'Guardar rascunho'}</button><button type="button" disabled={busy} onClick={onCancel}>Voltar à listagem</button></div>
