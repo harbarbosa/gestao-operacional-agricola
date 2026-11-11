@@ -6,6 +6,9 @@ use App\Field\FieldAccess;
 class HarvestsController extends BaseController
 {
  private function run(callable $fn){try{return $this->response->setJSON($fn(new HarvestBook(db_connect())));}catch(FieldProblem $e){return $this->response->setStatusCode($e->status)->setJSON(['error'=>$e->getMessage()]);}}
+ public function startContract(){return $this->run(fn($b)=>$b->startContract($this->request->getJSON(true)??[]));}
+ public function workerHistory(string $id){return $this->run(fn()=>['item'=>(new \App\Field\WorkerSafety(db_connect()))->history((int)$id)]);}
+ public function workerBlock(string $id){return $this->run(fn()=>(new \App\Field\WorkerSafety(db_connect()))->block((int)$id,$this->request->getJSON(true)??[]));}
  public function contracts(){return $this->run(fn($b)=>$b->listing('contracts'));}
  public function createContract(){return $this->run(fn($b)=>$b->createContract($this->request->getJSON(true)??[]));}
  public function index(){return $this->run(fn($b)=>$b->listing('harvests'));}

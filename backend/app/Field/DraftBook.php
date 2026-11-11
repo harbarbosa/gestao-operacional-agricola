@@ -134,6 +134,7 @@ class DraftBook
         foreach ($rows as &$row) {
             $worker=$this->lock('agri_workers',$row['worker_id']); if(!$worker || (!isset($previous[$row['worker_id']]) && !$worker['is_active'])) throw new FieldProblem(422,'Trabalhador inexistente ou inativo.');
             if ($team !== null && ! isset($previous[$row['worker_id']]) && (int) $worker['team_id'] !== $team) { $this->db->table('agri_workers')->where('id',$worker['id'])->set('version','version + 1',false)->update(['team_id'=>$team,'updated_at'=>gmdate('Y-m-d H:i:s')]); $after=$this->db->table('agri_workers')->where('id',$worker['id'])->get()->getRowArray(); $this->db->table('agri_catalog_audit')->insert(['resource'=>'workers','record_id'=>$worker['id'],'actor_id'=>auth()->id(),'action'=>'associate','before_json'=>json_encode($worker),'after_json'=>json_encode($after),'created_at'=>gmdate('Y-m-d H:i:s')]); }
+            if($worker['is_blocked'] && $row['present']) throw new FieldProblem(422,'Trabalhador bloqueado: '.$worker['name'].'. '.$worker['block_reason']);
             $row['worker_name'] = $previous[$row['worker_id']]['worker_name'] ?? $worker['name'];
         }
         return $rows;

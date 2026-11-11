@@ -246,7 +246,7 @@ class CatalogController extends BaseController
         foreach (['id', 'version', 'team_id', 'client_id', 'payment_unit_id', 'billing_unit_id', 'manager_user_id'] as $field) {
             if (isset($row[$field])) { $row[$field] = (int) $row[$field]; }
         }
-        $row['is_active'] = (bool) $row['is_active'];
+        $row['is_active'] = (bool) $row['is_active'];if(array_key_exists('is_blocked',$row))$row['is_blocked']=(bool)$row['is_blocked'];
         return $row;
     }
 

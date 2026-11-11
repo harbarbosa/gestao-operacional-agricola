@@ -1,4 +1,4 @@
-import { useEffect, useState, type SubmitEvent } from 'react'
+import { useEffect, useState, type ReactNode, type SubmitEvent } from 'react'
 import { api, ApiError } from './api'
 import Modal from './Modal'
 import type {Harvest} from './Harvests'
@@ -10,10 +10,11 @@ import { attendeePayload, type AttendeeForm, type WorkLog, type WorkLogList } fr
 import { canonicalDecimal } from './pricing'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon' }).format(new Date())
-type Props = { admin?: boolean; onSessionExpired: () => void; onBusyChange: (value: boolean) => void }
+type Props = { admin?: boolean; todayMode?:boolean; onSessionExpired: () => void; onBusyChange: (value: boolean) => void }
 type UnitContext = { version: number; payment: string; billing: string }
 
-function DraftForm({ item, onSaved, onCancel, onSessionExpired, onBusyChange }: Props & { item: WorkLog | null; onSaved: () => void; onCancel: () => void }) {
+function DraftForm({ admin=false, item, onSaved, onCancel, onSessionExpired, onBusyChange }: Props & { item: WorkLog | null; onSaved: (saved:WorkLog,warning?:string) => void; onCancel: () => void }) {
+  const [photoWorker,setPhotoWorker]=useState<string|null>(null)
   const [requestId] = useState(() => crypto.randomUUID())
   const [date, setDate] = useState(item?.work_date ?? today)
   const [client, setClient] = useState(String(item?.client_id ?? ''))
@@ -25,7 +26,7 @@ function DraftForm({ item, onSaved, onCancel, onSessionExpired, onBusyChange }: 
   const [billing, setBilling] = useState(item?.billing_quantity ? maskDecimal(item.billing_quantity) : '')
   const [pools, setPools] = useState<{pool_key:string;name:string;quantity:string}[]>(item?.pools ?? [])
   const [rows, setRows] = useState<AttendeeForm[]>(() => item?.attendees.map(row => ({ key: crypto.randomUUID(), poolKey: row.pool_key ?? '', worker: String(row.worker_id), present: row.present, timeIn: row.time_in ?? '', timeOut: row.time_out ?? '', nextDay: row.exit_next_day, quantity: row.payment_quantity ? maskDecimal(row.payment_quantity) : '', score: String(row.score ?? ''), notes: row.notes ?? '' })) ?? [])
-  const [participantNames] = useState<Record<string,string>>(()=>Object.fromEntries(item?.attendees.map(row=>[String(row.worker_id),row.worker_name])??[]))
+  const [participantNames,setParticipantNames] = useState<Record<string,string>>(()=>Object.fromEntries(item?.attendees.map(row=>[String(row.worker_id),row.worker_name])??[]))
   const [context, setContext] = useState<UnitContext | null>(item ? { version: 0, payment: item.payment_unit_name, billing: item.billing_unit_name } : null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
@@ -33,33 +34,36 @@ function DraftForm({ item, onSaved, onCancel, onSessionExpired, onBusyChange }: 
   async function save(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); onBusyChange(true); setMessage('')
     try {
+      const finish=(event.nativeEvent as unknown as {submitter:HTMLButtonElement|null}).submitter?.name==='finish'
+      if(finish&&rows.some(r=>r.present&&!r.score))throw new Error('Avalie todos os trabalhadores presentes antes de encerrar o dia.')
       if (!context) throw new Error('Selecione e confirme o serviço antes de guardar.')
       const contents = { pools: pools.map(pool => ({...pool, quantity: canonicalDecimal(pool.quantity)})), notes, billing_quantity: billing ? canonicalDecimal(billing) : null, attendees: rows.map(attendeePayload) }
       const payload = item ? { ...contents, version: item.version } : { ...contents, request_id: requestId, work_date: date, client_id: Number(client), site_id: Number(site), harvest_id: Number(harvest), service_id: Number(service), service_version: context.version }
-      await api(`/work-logs${item ? `/${item.id}` : ''}`, { method: item ? 'PUT' : 'POST', body: JSON.stringify(payload) })
-      onSaved()
+      const result=await api<{item:WorkLog}>(`/work-logs${item ? `/${item.id}` : ''}`, { method: item ? 'PUT' : 'POST', body: JSON.stringify(payload) })
+      if(finish){try{await api(`/work-logs/${result.item.id}/submit`,{method:'POST',body:JSON.stringify({version:result.item.version})});onSaved({...result.item,status:'submitted',version:result.item.version+1})}catch(error){onSaved(result.item,error instanceof Error?error.message:'Guardado, mas o encerramento não foi confirmado.')}}else onSaved(result.item)
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) onSessionExpired()
       else setMessage(error instanceof TypeError ? 'Não foi possível confirmar a gravação. Consulte a listagem ou repita sem alterar os dados; o identificador deste envio foi preservado.' : error instanceof Error ? error.message : 'Falha ao guardar.')
     } finally { setBusy(false); onBusyChange(false) }
   }
   const hasQuantities = !!billing || rows.some(row => !!row.quantity)
-  return <form className="record-form" onSubmit={save}>
-    <h3>{item ? `Editar diário #${item.id}` : 'Novo diário em rascunho'}</h3>
+  return <><form className="record-form" onSubmit={save}>
+    <h3>{item ? `Editar diário #${item.id}` : 'Novo trabalho em rascunho'}</h3>
     {item ? <p><strong>{formatDate(item.work_date)}</strong> · {item.client_name} · {item.site_name}<br />{item.responsible_name ?? item.team_name} · {item.service_name}</p> : <>
       <label htmlFor="work-date">Data do trabalho</label><input id="work-date" type="date" lang="pt-PT" required disabled={busy} value={date} onChange={e => setDate(e.target.value)} />
-      <label htmlFor="work-harvest">Colheita</label><select id="work-harvest" required disabled={busy || hasQuantities || rows.length>0} value={harvest} onChange={async e=>{const value=e.target.value;setHarvest(value);setContext(null);try{const h=(await api<{item:Harvest}>(`/harvests/${value}`)).item;setClient(String((h as unknown as {client_id:number}).client_id));setSite(String((h as unknown as {site_id:number}).site_id));setService(String((h as unknown as {service_id:number}).service_id));setContext({version:1,payment:h.payment_unit_name,billing:h.billing_unit_name})}catch{setMessage('Não foi possível abrir a colheita.')}}}><option value="">Selecionar colheita</option>{harvests.map(h=><option key={h.id} value={h.id}>{h.name} · {h.client_name}</option>)}</select>
+      <label htmlFor="work-harvest">Contrato</label><select id="work-harvest" required disabled={busy || hasQuantities || rows.length>0} value={harvest} onChange={async e=>{const value=e.target.value;setHarvest(value);setContext(null);try{const h=(await api<{item:Harvest}>(`/harvests/${value}`)).item;setClient(String((h as unknown as {client_id:number}).client_id));setSite(String((h as unknown as {site_id:number}).site_id));setService(String((h as unknown as {service_id:number}).service_id));setContext({version:1,payment:h.payment_unit_name,billing:h.billing_unit_name})}catch{setMessage('Não foi possível abrir a colheita.')}}}><option value="">Selecionar contrato</option>{harvests.map(h=><option key={h.id} value={h.id}>{h.name} · {h.client_name}</option>)}</select>
 
     </>}
     <h3>Grupos de colheita</h3>
-    {pools.map(pool => <fieldset key={pool.pool_key} disabled={busy}><legend>{pool.name}</legend><label htmlFor={`pool-name-${pool.pool_key}`}>Nome do grupo</label><input id={`pool-name-${pool.pool_key}`} required maxLength={100} value={pool.name} onChange={event => setPools(old => old.map(p => p.pool_key === pool.pool_key ? {...p,name:event.target.value} : p))} /><label htmlFor={`pool-qty-${pool.pool_key}`}>Produção conjunta ({context?.payment ?? 'unidade'})</label><input id={`pool-qty-${pool.pool_key}`} required inputMode="decimal" value={pool.quantity} onChange={event => setPools(old => old.map(p => p.pool_key === pool.pool_key ? {...p,quantity:maskDecimal(event.target.value)} : p))} /><button type="button" onClick={() => { setPools(old=>old.filter(p=>p.pool_key!==pool.pool_key)); setRows(old=>old.map(r=>r.poolKey===pool.pool_key?{...r,poolKey:''}:r)) }}>Remover grupo</button></fieldset>)}
-    <button type="button" disabled={busy || pools.length >= 50} onClick={() => setPools(old=>[...old,{pool_key:crypto.randomUUID().replaceAll('-','').slice(0,16),name:`Grupo ${old.length+1}`,quantity:''}])}>Adicionar grupo de divisão igual</button>
+    {pools.map(pool => <fieldset key={pool.pool_key} disabled={busy}><legend>{pool.name}</legend><label htmlFor={`pool-name-${pool.pool_key}`}>Nome do grupo</label><input id={`pool-name-${pool.pool_key}`} required maxLength={100} value={pool.name} onChange={event => setPools(old => old.map(p => p.pool_key === pool.pool_key ? {...p,name:event.target.value} : p))} /><label htmlFor={`pool-qty-${pool.pool_key}`}>Produção conjunta ({context?.payment ?? 'unidade'})</label><input id={`pool-qty-${pool.pool_key}`} required inputMode="decimal" value={pool.quantity} onChange={event => setPools(old => old.map(p => p.pool_key === pool.pool_key ? {...p,quantity:maskDecimal(event.target.value)} : p))} /><details><summary>Trabalhadores deste grupo</summary>{rows.map(r=><label className="checkbox" key={r.key}><input type="checkbox" checked={r.poolKey===pool.pool_key} disabled={!r.present} onChange={event=>setRows(old=>old.map(w=>w.key===r.key?{...w,poolKey:event.target.checked?pool.pool_key:'',quantity:''}:w))}/>{participantNames[r.worker]??`Trabalhador #${r.worker}`}</label>)}</details><button type="button" onClick={() => { setPools(old=>old.filter(p=>p.pool_key!==pool.pool_key)); setRows(old=>old.map(r=>r.poolKey===pool.pool_key?{...r,poolKey:''}:r)) }}>Remover grupo</button></fieldset>)}
+    <button type="button" disabled={busy || pools.length >= 50} onClick={() => setPools(old=>[...old,{pool_key:crypto.randomUUID().replaceAll('-','').slice(0,16),name:`Grupo ${old.length+1}`,quantity:''}])}>Criar grupo</button>
     <h3>Participantes</h3>
-    <Participants rows={rows} onChange={setRows} pools={pools} unit={context?.payment ?? 'unidade'} disabled={busy} canAdd={!!item || !!harvest} initialNames={participantNames}/>
-    <label htmlFor="work-billing">Quantidade total para o cliente ({context?.billing ?? 'unidade a confirmar'})</label><input id="work-billing" inputMode="decimal" maxLength={20} value={billing} disabled={busy || !context} onChange={e => setBilling(maskDecimal(e.target.value))} />
-    <label htmlFor="work-notes">Observações do diário</label><textarea id="work-notes" maxLength={2000} disabled={busy} value={notes} onChange={e => setNotes(e.target.value)} />
-    <p role="status" aria-live="polite">{message}</p><div className="actions"><button disabled={busy || !context}>{busy ? 'A guardar…' : 'Guardar rascunho'}</button><button type="button" disabled={busy} onClick={onCancel}>Voltar à listagem</button></div>
-  </form>
+    <Participants rows={rows} onChange={setRows} pools={pools} unit={context?.payment ?? 'unidade'} disabled={busy} canAdd={!!item || !!harvest} initialNames={participantNames} onNamesChange={names=>setParticipantNames(old=>({...old,...names}))} onPhoto={item?worker=>setPhotoWorker(worker):undefined}/>
+    {admin&&<>    <label htmlFor="work-billing">Quantidade total para o cliente ({context?.billing ?? 'unidade a confirmar'})</label><input id="work-billing" inputMode="decimal" maxLength={20} value={billing} disabled={busy || !context} onChange={e => setBilling(maskDecimal(e.target.value))} />
+</>}<details><summary>Observações do dia</summary>    <label htmlFor="work-notes">Observações do diário</label><textarea id="work-notes" maxLength={2000} disabled={busy} value={notes} onChange={e => setNotes(e.target.value)} />
+</details>
+    <p role="status" aria-live="polite">{message}</p><div className="actions"><button disabled={busy || !context}>{busy ? 'A guardar…' : 'Guardar'}</button>{(!item||!!item.harvest_id)&&<button name="finish" disabled={busy || !context}>Encerrar dia</button>}<button type="button" disabled={busy} onClick={onCancel}>Voltar</button></div>
+  </form>{photoWorker!==null&&item&&<Modal title="Fotografia da produção" onClose={()=>setPhotoWorker(null)} busy={busy}><ProductionPhotos item={item} initialWorker={photoWorker} onSessionExpired={onSessionExpired} onBusyChange={value=>{setBusy(value);onBusyChange(value)}}/></Modal>}</>
 }
 
 function ReadOnlyLog({ item, onBack }: { item: WorkLog; onBack: () => void }) {
@@ -69,12 +73,15 @@ function ReadOnlyLog({ item, onBack }: { item: WorkLog; onBack: () => void }) {
   </section>
 }
 
-export default function WorkLogs({ admin = false, onSessionExpired, onBusyChange }: Props) {
+function EditorContainer({inline,children,...props}:{inline:boolean;children:ReactNode;title:string;busy:boolean;onClose:()=>void}){return inline?<section className="field-workspace">{children}</section>:<Modal {...props}>{children}</Modal>}
+
+export default function WorkLogs({ admin = false, todayMode=false, onSessionExpired, onBusyChange }: Props) {
   const [items, setItems] = useState<WorkLog[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [date, setDate] = useState('')
-  const [queryDate, setQueryDate] = useState('')
+  const [queryDate, setQueryDate] = useState(todayMode?today():'')
+  const [openedToday,setOpenedToday]=useState(false)
   const [reload, setReload] = useState(0)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -93,6 +100,7 @@ export default function WorkLogs({ admin = false, onSessionExpired, onBusyChange
     })
     return () => { current = false }
   }, [page, queryDate, reload, onSessionExpired])
+  useEffect(()=>{if(todayMode&&!loading&&!openedToday){setOpenedToday(true);const draft=items.find(i=>i.status==='draft');if(draft)void open(draft);else if(items.length===0)setEditor('new')}},[todayMode,loading,openedToday,items])
   function refresh() { setLoading(true); setReload(value => value + 1) }
   async function open(item: WorkLog) {
     setBusy(true); onBusyChange(true); setMessage('')
@@ -123,12 +131,12 @@ export default function WorkLogs({ admin = false, onSessionExpired, onBusyChange
     catch (error) { if (error instanceof ApiError && error.status === 401) onSessionExpired(); else { setMessage(error instanceof Error ? error.message : 'Falha ao cancelar.'); refresh() } }
     finally { setBusy(false); onBusyChange(false) }
   }
-  return <section className="catalog"><div className="section-title"><h2>Diário de campo</h2><button disabled={busy || !!editor} onClick={() => { setEditor('new'); setCanceling(null) }}>Novo diário</button></div>
+  return <section className="catalog"><div className="section-title"><h2>{todayMode?'Trabalho de hoje':'Histórico de trabalhos'}</h2><button disabled={busy || !!editor} onClick={() => { setEditor('new'); setCanceling(null) }}>Novo trabalho</button></div>
     {closing && <Modal title={`Fechar atividade #${closing.item.id}`} busy={busy} onClose={()=>setClosing(null)}><p>Confirme os valores de cada trabalhador. Grupos usam a tarifa padrão do serviço e divisão igual.</p><div className="table-wrap"><table><thead><tr><th>Trabalhador</th><th>Grupo</th><th>Valor</th></tr></thead><tbody>{closing.allocations.map(row=><tr key={row.worker_id}><td>{row.worker_name}</td><td>{row.pool_name ?? 'Individual'}</td><td>{formatCents(row.amount_cents)}</td></tr>)}</tbody></table></div><p role="status">{message}</p><div className="actions"><button disabled={busy} onClick={closeActivity}>Confirmar fecho</button><button disabled={busy} onClick={()=>setClosing(null)}>Voltar</button></div></Modal>}
-    {editor && <Modal title={editor === 'new' ? 'Novo diário de campo' : `Diário #${editor.id}`} busy={busy} onClose={() => { setEditor(null); refresh() }}>{(editor !== 'new' && editor.status !== 'draft' ? <ReadOnlyLog item={editor} onBack={() => setEditor(null)} /> : <DraftForm key={editor === 'new' ? 'new' : editor.id} item={editor === 'new' ? null : editor} onSessionExpired={onSessionExpired} onBusyChange={value => { setBusy(value); onBusyChange(value) }} onSaved={() => { setEditor(null); setMessage('Rascunho guardado.'); refresh() }} onCancel={() => { setEditor(null); refresh() }} />)}{editor !== 'new' && <ProductionPhotos item={editor} onSessionExpired={onSessionExpired} onBusyChange={value=>{setBusy(value);onBusyChange(value)}}/>}</Modal>}
+    {editor && <EditorContainer inline={todayMode} title={editor === 'new' ? 'Novo trabalho de campo' : `Diário #${editor.id}`} busy={busy} onClose={() => { setEditor(null); refresh() }}>{(editor !== 'new' && editor.status !== 'draft' ? <ReadOnlyLog item={editor} onBack={() => setEditor(null)} /> : <DraftForm admin={admin} key={editor === 'new' ? 'new' : editor.id} item={editor === 'new' ? null : editor} onSessionExpired={onSessionExpired} onBusyChange={value => { setBusy(value); onBusyChange(value) }} onSaved={(saved,warning) => { setEditor(todayMode?saved:null); setMessage(warning??(saved.status==='submitted'?'Dia enviado para validação.':'Guardado.')); refresh() }} onCancel={() => { setEditor(null); refresh() }} />)}{!todayMode && editor !== 'new' && <ProductionPhotos item={editor} onSessionExpired={onSessionExpired} onBusyChange={value=>{setBusy(value);onBusyChange(value)}}/>}</EditorContainer>}
     <>
-      <form className="search" onSubmit={event => { event.preventDefault(); setPage(1); setQueryDate(date); refresh() }}><label htmlFor="diary-filter">Filtrar por data</label><input id="diary-filter" type="date" lang="pt-PT" value={date} disabled={busy} onChange={e => setDate(e.target.value)} /><button disabled={busy}>Filtrar</button></form>
-      {loading ? <p>A carregar…</p> : <><div className="table-wrap"><table><thead><tr><th>Data / controlador</th><th>Cliente / local</th><th>Serviço / estado</th><th>Ações</th></tr></thead><tbody>
+      {(!todayMode||!editor)&&<form className="search" onSubmit={event => { event.preventDefault(); setPage(1); setQueryDate(date); refresh() }}><label htmlFor="diary-filter">Filtrar por data</label><input id="diary-filter" type="date" lang="pt-PT" value={date} disabled={busy} onChange={e => setDate(e.target.value)} /><button disabled={busy}>Filtrar</button></form>}
+      {todayMode&&editor?null:loading ? <p>A carregar…</p> : <><div className="table-wrap"><table><thead><tr><th>Data / controlador</th><th>Cliente / local</th><th>Serviço / estado</th><th>Ações</th></tr></thead><tbody>
         {items.map(item => <tr key={item.id}><td>{formatDate(item.work_date)}<br />{item.responsible_name ?? item.team_name}</td><td>{item.client_name}<br />{item.site_name}</td><td>{item.service_name}<br />{statusLabel(item.status)}{item.cancel_reason && <><br />{item.cancel_reason}</>}</td><td><div className="row-actions">{item.status === 'submitted' && admin && <><button disabled={busy} onClick={()=>validateDay(item,'validate')}>Validar</button><button disabled={busy} onClick={()=>validateDay(item,'return')}>Devolver</button></>}{item.status === 'draft' && (!!item.harvest_id || admin) && <button className="icon-action" title="Encerrar dia" aria-label={`Fechar atividade ${item.id}`} disabled={busy} onClick={() => previewClose(item)}><Icon name="end" /></button>}<button className="icon-action" title={item.status === 'draft' ? 'Editar' : 'Consultar'} aria-label={`${item.status === 'draft' ? 'Editar' : 'Consultar'} diário ${item.id}`} disabled={busy} onClick={() => open(item)}><Icon name={item.status === 'draft' ? 'edit' : 'view'} /></button><button className="icon-action danger" title="Excluir (cancelar com histórico)" aria-label={`Cancelar diário ${item.id}`} disabled={busy || item.status !== 'draft'} onClick={() => { setCanceling(item); setReason('') }}><Icon name="trash" /></button></div></td></tr>)}
         {!items.length && <tr><td colSpan={4}>Nenhum diário encontrado.</td></tr>}
       </tbody></table></div><div className="actions"><button disabled={busy || page === 1} onClick={() => { setLoading(true); setPage(value => value - 1) }}>Anterior</button><span>Página {page}</span><button disabled={busy || page * 25 >= total} onClick={() => { setLoading(true); setPage(value => value + 1) }}>Seguinte</button><button disabled={busy} onClick={refresh}>Recarregar</button></div></>}

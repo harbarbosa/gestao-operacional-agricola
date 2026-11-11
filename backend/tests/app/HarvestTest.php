@@ -41,7 +41,7 @@ final class HarvestTest extends CIUnitTestCase
  {
   $l=$this->validated();$this->login($this->leader);$b=new HarvestBook($this->db);$h=$b->detail($this->harvest);$this->assertArrayNotHasKey('summary',$h);$this->assertArrayNotHasKey('payment_rate',$h);$this->assertArrayNotHasKey('workers',$h);$this->assertArrayNotHasKey('earnings',$h['activities'][0]);
   $r=$this->request('/work-logs/'.$l['id'],[],'get');$r->assertStatus(200);$this->assertStringNotContainsString('amount_cents',$r->getJSON());$this->request('/contracts',[],'get')->assertStatus(403);$this->request('/work-logs/'.$l['id'].'/close-preview',[],'get')->assertStatus(403);
-  $this->login($this->foreign);$this->request('/harvests/'.$this->harvest,[],'get')->assertStatus(403);$this->request('/work-logs/'.$l['id'],[],'get')->assertStatus(403);$this->request('/work-logs/'.$l['id'].'/photos',[],'get')->assertStatus(403);
+  $this->login($this->foreign);$this->request('/harvests/'.$this->harvest,[],'get')->assertStatus(200);$this->request('/work-logs/'.$l['id'],[],'get')->assertStatus(403);$this->request('/work-logs/'.$l['id'].'/photos',[],'get')->assertStatus(403);
  }
  public function testMissingEvaluationBlocksDailyClosureAndValidationCannotDuplicate():void
  {
@@ -69,6 +69,24 @@ final class HarvestTest extends CIUnitTestCase
  public function testMeasuredShortfallDoesNotReduceWorkerEarnings():void
  {
   $l=$this->validated();$b=new HarvestBook($this->db);$b->delivery($this->harvest,['request_id'=>$this->uuid(),'delivered_on'=>'2026-11-03','reference'=>'Peso menor','billing_quantity'=>'850','items'=>[['work_log_id'=>$l['id'],'quantity'=>'500']]]);$s=$b->detail($this->harvest)['summary'];$this->assertEquals(-150,$s['difference']);$this->assertEquals(1.7,$s['actual_ratio']);$this->assertSame(450000,$s['payable_cents']);$this->assertSame(510000,$s['receivable_cents']);
+ }
+
+ public function testUnifiedContractNeedsNoControllerAndActivitiesRemainPrivate():void
+ {
+  $client=$this->fixture('clients',['name'=>'Cliente simplificado']);$unit=$this->fixture('units',['name'=>'Saco','code'=>'saco']);$book=new HarvestBook($this->db);$h=$book->startContract(['name'=>'Apanha','client_id'=>$client,'local_name'=>'Campo sul','payment_unit_id'=>$unit,'billing_unit_id'=>$unit,'billing_rate'=>'10','payment_rate'=>'5','starts_on'=>'2026-11-01'])['item'];$this->assertSame(0,(int)$h['controller_id']);$this->assertSame('Campo sul',$h['site_name']);$this->assertSame('Apanha',$h['service_name']);
+  $this->login($this->foreign);$log=(new DraftBook($this->db))->create(['request_id'=>$this->uuid(),'harvest_id'=>(int)$h['id'],'work_date'=>'2026-11-02','attendees'=>[['worker_id'=>$this->workers[0],'present'=>true,'score'=>4,'payment_quantity'=>'5']]],$this->foreign)['item'];$this->assertSame($this->foreign,(int)$log['controller_id']);$this->request('/work-logs/'.$log['id'],[],'get')->assertStatus(200);
+  $this->login($this->leader);$this->request('/work-logs/'.$log['id'],[],'get')->assertStatus(403);$this->assertCount(0,$book->detail((int)$h['id'])['activities']);
+ }
+ public function testWorkerHistoryWarnsWithoutAutomaticallyBlocking():void
+ {
+  $l=$this->log(2);$book=new HarvestBook($this->db);$book->daily($l['id'],'submit',['version'=>$l['version']]);$safety=new \App\Field\WorkerSafety($this->db);$h=$safety->history($this->workers[0]);$this->assertTrue($h['low_performance']);$this->assertFalse($h['is_blocked']);$this->assertSame(1,$h['evaluation_count']);$this->assertCount(1,$h['evaluations']);$this->assertArrayNotHasKey('amount_cents',$h);
+  $this->request('/field/options/workers/'.$this->workers[0],[],'get')->assertStatus(200);$r=$this->request('/workers/'.$this->workers[0].'/history',[],'get');$r->assertStatus(200);$this->assertStringNotContainsString('payment_rate',$r->getJSON());
+ }
+ public function testBlockingIsAdministrativeAuditedAndPreventsNewAssociation():void
+ {
+  $id=$this->workers[0];$safety=new \App\Field\WorkerSafety($this->db);$in=['version'=>1,'blocked'=>true,'reason'=>'Ocorrência confirmada'];$this->login($this->leader);$this->request('/workers/'.$id.'/block',$in)->assertStatus(403);
+  $this->login($this->actor);$result=$safety->block($id,$in);$this->assertTrue($result['item']['is_blocked']);$this->seeInDatabase('agri_catalog_audit',['resource'=>'workers','record_id'=>$id,'action'=>'block']);$this->login($this->leader);try{$this->log();$this->fail('Trabalhador bloqueado associado');}catch(FieldProblem $e){$this->assertSame(422,$e->status);}
+  $this->login($this->actor);$safety->block($id,['version'=>2,'blocked'=>false,'reason'=>'Ocorrência resolvida']);$this->assertFalse($safety->history($id)['is_blocked']);$this->assertSame('draft',$this->log()['status']);
  }
 
 }

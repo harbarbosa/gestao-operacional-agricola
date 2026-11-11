@@ -18,7 +18,7 @@ class HarvestBook
     public static function date($v): string { $d=is_string($v)?\DateTimeImmutable::createFromFormat('!Y-m-d',$v):false;if(!$d||$d->format('Y-m-d')!==$v)throw new FieldProblem(422,'Data inválida.');return $v; }
     private function text($v,int $max=160): string { if(!is_string($v)||mb_strlen(trim($v))<1||mb_strlen($v)>$max)throw new FieldProblem(422,'Preencha os campos obrigatórios.');return trim($v); }
     private function record(string $table,int $id): array { $r=$this->db->table('agri_'.$table)->where('id',$id)->get()->getRowArray();if(!$r)throw new FieldProblem(404,'Registo não encontrado.');return $r; }
-    public function access(int $id): array { FieldAccess::requireField();$h=$this->record('harvests',$id);if(!FieldAccess::manager()&&!self::admin()&&(int)$h['controller_id']!==(int)auth()->id())throw new FieldProblem(403,'Sem acesso a esta colheita.');return $h; }
+    public function access(int $id): array { FieldAccess::requireField();$h=$this->record('harvests',$id);return $h; }
     private function lock(int $id): array { $r=$this->db->query('SELECT * FROM '.$this->db->escapeIdentifiers($this->db->prefixTable('agri_harvests')).' WHERE id=?'.($this->db->getPlatform()==='MySQLi'?' FOR UPDATE':''),[$id])->getRowArray();if(!$r)throw new FieldProblem(404,'Colheita não encontrada.');return $r; }
     private function tx(callable $fn): array { $this->db->transBegin();try{$r=$fn();if(!$this->db->transStatus()||!$this->db->transCommit())throw new \RuntimeException('Persistence');return $r;}catch(\Throwable $e){$this->db->transRollback();if($e instanceof FieldProblem)throw $e;log_message('error','Falha colheita: {error}',['error'=>$e->getMessage()]);throw new FieldProblem(409,'Não foi possível confirmar. Recarregue antes de repetir.');} }
     private function request(array $in): string { $v=$in['request_id']??null;if(!is_string($v)||!preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/D',$v))throw new FieldProblem(422,'Identificador inválido.');return $v; }
@@ -27,9 +27,20 @@ class HarvestBook
     {
         if($type==='contracts')self::requireAdmin();elseif(!self::admin()&&!auth()->user()->can('reports.view'))FieldAccess::requireField();
         $q=$this->db->table('agri_'.$type.' h')->select('h.*,c.name AS client_name,s.name AS service_name,p.name AS site_name')->join('agri_clients c','c.id=h.client_id')->join('agri_services s','s.id=h.service_id')->join('agri_sites p','p.id=h.site_id');
-        if($type==='harvests'&&!FieldAccess::manager()&&!self::admin()&&!auth()->user()->can('reports.view'))$q->where('h.controller_id',auth()->id());
+
         $items=$q->orderBy('h.id','DESC')->get()->getResultArray();
         if(!self::admin())foreach($items as &$r)unset($r['billing_rate'],$r['payment_rate'],$r['conversion_factor']);return ['items'=>$items];
+    }
+    public function startContract(array $in):array
+    {
+        self::requireAdmin();return $this->tx(function()use($in){
+            $client=$this->record('clients',(int)($in['client_id']??0));$now=gmdate('Y-m-d H:i:s');
+            $data=$in;
+            if(empty($data['site_id'])){$this->db->table('agri_sites')->insert(['client_id'=>$client['id'],'name'=>$this->text($in['local_name']??$client['name']),'created_at'=>$now,'updated_at'=>$now]);$data['site_id']=(int)$this->db->insertID();}
+            if(empty($data['service_id'])){$this->db->table('agri_services')->insert(['name'=>$this->text($in['name']??null),'billing_unit_id'=>(int)($in['billing_unit_id']??0),'payment_unit_id'=>(int)($in['payment_unit_id']??0),'created_at'=>$now,'updated_at'=>$now]);$data['service_id']=(int)$this->db->insertID();}
+            $contract=$this->createContract($data)['item'];$contractId=(int)$contract['id'];unset($contract['id']);$contract+=['contract_id'=>$contractId,'controller_id'=>0,'starts_on'=>self::date($in['starts_on']??null),'status'=>'active'];
+            $this->db->table('agri_harvests')->insert($contract);return ['item'=>$this->detail((int)$this->db->insertID())];
+        });
     }
     public function createContract(array $in): array
     {
@@ -49,12 +60,12 @@ class HarvestBook
     public function activityInput(array $in): array
     {
         $h=$this->access((int)$in['harvest_id']);if($h['status']!=='active')throw new FieldProblem(409,'A colheita está encerrada.');if(($in['work_date']??'')<$h['starts_on'])throw new FieldProblem(422,'A atividade antecede a colheita.');
-        $s=$this->record('services',(int)$h['service_id']);return array_replace($in,['team_id'=>null,'controller_id'=>(int)$h['controller_id'],'client_id'=>(int)$h['client_id'],'site_id'=>(int)$h['site_id'],'service_id'=>(int)$h['service_id'],'service_version'=>(int)$s['version']]);
+        $s=$this->record('services',(int)$h['service_id']);return array_replace($in,['team_id'=>null,'controller_id'=>(int)auth()->id(),'client_id'=>(int)$h['client_id'],'site_id'=>(int)$h['site_id'],'service_id'=>(int)$h['service_id'],'service_version'=>(int)$s['version']]);
     }
     public static function operational(array $log): array { unset($log['earnings'],$log['closure_hash']);return $log; }
     public function daily(int $id,string $action,array $in): array
     {
-        return $this->tx(function()use($id,$action,$in){$raw=$this->record('work_logs',$id);$h=$this->lock((int)$raw['harvest_id']);$this->access((int)$h['id']);$log=(new DraftBook($this->db))->get($id);
+        return $this->tx(function()use($id,$action,$in){$raw=$this->record('work_logs',$id);$h=$this->lock((int)$raw['harvest_id']);FieldAccess::checkLog($raw);$this->access((int)$h['id']);$log=(new DraftBook($this->db))->get($id);
             if($h['status']!=='active')throw new FieldProblem(409,'Colheita encerrada.');
             if(!is_int($in['version']??null)||$in['version']!==$log['version'])throw new FieldProblem(409,'Atividade alterada. Reabra o registo.');
             if($action==='return'){self::requireAdmin();if($log['status']!=='submitted')throw new FieldProblem(409,'Atividade não está em validação.');$status='draft';}
@@ -66,7 +77,7 @@ class HarvestBook
     private function allocations(array $log,array $h,bool $money): array
     {
         $people=array_values(array_filter($log['attendees'],fn($p)=>$p['present']));if(!$people)throw new FieldProblem(422,'Adicione trabalhadores presentes.');$result=[];
-        foreach($people as$p){if(!$p['score'])throw new FieldProblem(422,'Avalie obrigatoriamente todos os trabalhadores presentes.');if(!$p['pool_key']){if($p['payment_quantity']===null)throw new FieldProblem(422,'Complete a produção de cada trabalhador.');$result[]=['worker_id'=>$p['worker_id'],'quantity'=>$p['payment_quantity'],'amount_cents'=>$money?ProductionBook::cents((string)BigDecimal::of($p['payment_quantity'])->multipliedBy($h['payment_rate'])):0];}}
+        foreach($people as$p){$w=$this->db->query('SELECT * FROM '.$this->db->escapeIdentifiers($this->db->prefixTable('agri_workers')).' WHERE id=?'.($this->db->getPlatform()==='MySQLi'?' FOR UPDATE':''),[(int)$p['worker_id']])->getRowArray();if($w['is_blocked'])throw new FieldProblem(422,'Trabalhador bloqueado: '.$w['name'].'. Remova-o da atividade.');if(!$p['score'])throw new FieldProblem(422,'Avalie obrigatoriamente todos os trabalhadores presentes.');if(!$p['pool_key']){if($p['payment_quantity']===null)throw new FieldProblem(422,'Complete a produção de cada trabalhador.');$result[]=['worker_id'=>$p['worker_id'],'quantity'=>$p['payment_quantity'],'amount_cents'=>$money?ProductionBook::cents((string)BigDecimal::of($p['payment_quantity'])->multipliedBy($h['payment_rate'])):0];}}
         foreach($log['pools']as$pool){$members=array_values(array_filter($people,fn($p)=>$p['pool_key']===$pool['pool_key']));if(count($members)<2)throw new FieldProblem(422,'Cada grupo precisa de pelo menos dois trabalhadores presentes.');$workers=array_column($members,'worker_id');$cents=$money?ProductionBook::cents((string)BigDecimal::of($pool['quantity'])->multipliedBy($h['payment_rate'])):0;$amounts=ProductionBook::divide($cents,$workers);$units=ProductionBook::divide(BigDecimal::of((string)$pool['quantity'])->toScale(4)->getUnscaledValue()->toInt(),$workers);foreach($workers as$w)$result[]=['worker_id'=>$w,'quantity'=>(string)BigDecimal::ofUnscaledValue($units[$w],4),'amount_cents'=>$amounts[$w]];}
         return $result;
     }
@@ -90,7 +101,7 @@ class HarvestBook
     public function detail(int $id): array
     {
         $h=$this->access($id);foreach(['client'=>'clients','site'=>'sites','service'=>'services','payment_unit'=>'units','billing_unit'=>'units']as$key=>$table)$h[$key.'_name']=$this->record($table,(int)$h[$key.'_id'])['name'];
-        $logs=$this->db->table('agri_work_logs')->where('harvest_id',$id)->orderBy('work_date')->orderBy('id')->get()->getResultArray();$h['activities']=array_map(fn($l)=>self::operational((new DraftBook($this->db))->get((int)$l['id'])),$logs);
+        $logs=$this->db->table('agri_work_logs')->where('harvest_id',$id)->orderBy('work_date')->orderBy('id')->get()->getResultArray();if(!self::admin()&&!FieldAccess::manager())$logs=array_values(array_filter($logs,fn($l)=>(int)$l['controller_id']===(int)auth()->id()));$h['activities']=array_map(fn($l)=>self::operational((new DraftBook($this->db))->get((int)$l['id'])),$logs);
         if(!self::admin()){unset($h['billing_rate'],$h['payment_rate'],$h['conversion_factor']);return $h;}
         $h['deliveries']=$this->db->table('agri_harvest_deliveries')->where('harvest_id',$id)->orderBy('id')->get()->getResultArray();
         $h['movements']=$this->db->table('agri_harvest_movements m')->select('m.*,w.name AS worker_name')->join('agri_workers w','w.id=m.worker_id','left')->where('m.harvest_id',$id)->orderBy('m.paid_on')->orderBy('m.id')->get()->getResultArray();
