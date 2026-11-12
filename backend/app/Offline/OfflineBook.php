@@ -10,7 +10,7 @@ class OfflineBook
  private function uuid($v):string{if(!is_string($v)||!preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/D',$v))throw new FieldProblem(422,'Identificador offline inválido.');return $v;}
  public function receipt(string $request,string $kind,array $payload,callable $operation):array
  {
-  FieldAccess::requireField();$request=$this->uuid($request);$actor=(int)auth()->id();$hash=hash('sha256',json_encode([$kind,$payload],JSON_THROW_ON_ERROR));$this->db->transBegin();
+  if($kind==='portrait')\App\Field\WorkerPortraits::access();else FieldAccess::requireField();$request=$this->uuid($request);$actor=(int)auth()->id();$hash=hash('sha256',json_encode([$kind,$payload],JSON_THROW_ON_ERROR));$this->db->transBegin();
   try{
    $user=$this->db->query('SELECT id FROM '.$this->db->escapeIdentifiers($this->db->prefixTable('users')).' WHERE id=?'.($this->db->getPlatform()==='MySQLi'?' FOR UPDATE':''),[$actor])->getRowArray();if(!$user)throw new FieldProblem(401,'Inicie sessão novamente.');
    $old=$this->db->table('agri_offline_receipts')->where('actor_id',$actor)->where('request_id',$request)->get()->getRowArray();
@@ -24,7 +24,7 @@ class OfflineBook
   $kind=$in['kind']??null;$payload=$in['payload']??null;if(!in_array($kind,['worker','work','submit'],true)||!is_array($payload)||array_is_list($payload))throw new FieldProblem(422,'Operação offline inválida.');
   return $this->receipt($in['request_id']??'', $kind,$payload,function()use($kind,$payload){
    if($kind==='worker'){
-    $name=$payload['name']??null;$phone=$payload['phone']??null;if(!is_string($name)||trim($name)===''||mb_strlen($name)>160||!is_string($phone)||mb_strlen($phone)>40||strlen(preg_replace('/\D/','',$phone))<9||array_diff(array_keys($payload),['name','phone']))throw new FieldProblem(422,'Preencha nome completo e telefone.');
+    $name=$payload['name']??null;$phone=$payload['phone']??'';if(!is_string($name)||trim($name)===''||mb_strlen($name)>160||!is_string($phone)||mb_strlen($phone)>40||array_diff(array_keys($payload),['name','phone']))throw new FieldProblem(422,'Preencha o nome completo. O telefone é opcional.');
     $now=gmdate('Y-m-d H:i:s');$row=['name'=>trim($name),'phone'=>$phone,'is_active'=>1,'created_at'=>$now,'updated_at'=>$now];$this->db->table('agri_workers')->insert($row);$id=(int)$this->db->insertID();$this->db->table('agri_catalog_audit')->insert(['resource'=>'workers','record_id'=>$id,'actor_id'=>auth()->id(),'action'=>'create','before_json'=>null,'after_json'=>json_encode($row),'created_at'=>$now]);return ['item'=>['id'=>$id,'name'=>trim($name),'phone'=>$phone,'version'=>1,'is_active'=>true,'is_blocked'=>false,'evaluation_count'=>0,'performance_avg'=>null,'low_performance'=>false]];
    }
    if($kind==='submit'){
@@ -43,7 +43,7 @@ class OfflineBook
  }
  public function snapshot():array
  {
-  FieldAccess::requireField();$workers=$this->db->table('agri_workers')->select('id,name,phone,is_active,is_blocked,block_reason,version')->orderBy('name')->get(10001)->getResultArray();if(count($workers)>10000)throw new FieldProblem(422,'A preparação offline suporta até 10 000 trabalhadores.');
+  FieldAccess::requireField();$workers=$this->db->table('agri_workers')->select('id,name,phone,is_active,is_blocked,block_reason,version,photo_version')->orderBy('name')->get(10001)->getResultArray();if(count($workers)>10000)throw new FieldProblem(422,'A preparação offline suporta até 10 000 trabalhadores.');
   $stats=$this->db->table('agri_work_log_attendees a')->select('a.worker_id,AVG(a.score) AS average,COUNT(a.score) AS total')->join('agri_work_logs l','l.id=a.work_log_id')->where('a.present',1)->whereIn('l.status',['submitted','closed'])->groupBy('a.worker_id')->get()->getResultArray();$stats=array_column($stats,null,'worker_id');
   $a=$this->db->escapeIdentifiers($this->db->prefixTable('agri_work_log_attendees'));$l=$this->db->escapeIdentifiers($this->db->prefixTable('agri_work_logs'));
   $history=$this->db->query("SELECT * FROM (SELECT a.worker_id,l.work_date,l.service_name,a.score,a.notes,ROW_NUMBER() OVER(PARTITION BY a.worker_id ORDER BY l.work_date DESC,l.id DESC) AS rn FROM $a a JOIN $l l ON l.id=a.work_log_id WHERE a.present=1 AND a.score IS NOT NULL AND l.status IN ('submitted','closed')) recent WHERE rn<=20")->getResultArray();$hist=[];foreach($history as$r){unset($r['rn']);$hist[$r['worker_id']][]=$r;}

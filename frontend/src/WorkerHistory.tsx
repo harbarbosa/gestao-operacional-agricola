@@ -2,7 +2,7 @@ import {useEffect,useState,type SubmitEvent} from 'react'
 import {api,ApiError} from './api'
 import Modal from './Modal'
 import {formatDate} from './locale'
-export type WorkerInfo={id:number;name:string;is_blocked:boolean;block_reason:string|null;performance_avg:number|null;evaluation_count:number;low_performance:boolean;version:number;evaluations?:{work_date:string;service_name:string;score:number;notes:string|null}[]}
+export type WorkerInfo={photo_version?:number;id:number;name:string;is_blocked:boolean;block_reason:string|null;performance_avg:number|null;evaluation_count:number;low_performance:boolean;version:number;evaluations?:{work_date:string;service_name:string;score:number;notes:string|null}[]}
 export function workerStatus(w:WorkerInfo){return w.is_blocked?`Bloqueado · ${w.block_reason??''}`:w.evaluation_count?`${w.low_performance?'Atenção: baixo desempenho · ':''}${Number(w.performance_avg).toFixed(1).replace('.',',')}/5 · ${w.evaluation_count} avaliações`:'Novo — sem histórico'}
 export default function WorkerHistory({id,admin=false,onClose,onChanged=()=>{}}:{id:number;admin?:boolean;onClose:()=>void;onChanged?:()=>void}){
  const [item,setItem]=useState<WorkerInfo|null>(null),[message,setMessage]=useState(''),[reason,setReason]=useState(''),[busy,setBusy]=useState(false)

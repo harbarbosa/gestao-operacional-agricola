@@ -84,3 +84,7 @@ $routes->post('api/v1/workers/([1-9][0-9]*)/block','HarvestsController::workerBl
 
 $routes->get('api/v1/field/offline','OfflineController::snapshot',['filter'=>'api-session']);
 $routes->post('api/v1/field/offline/apply','OfflineController::apply',['filter'=>'api-session']);
+
+$routes->post('api/v1/auth/password','AuthController::password',['filter'=>'api-session']);
+$routes->get('api/v1/workers/([1-9][0-9]*)/photo','HarvestsController::viewPortrait/$1',['filter'=>'api-session']);
+$routes->post('api/v1/workers/([1-9][0-9]*)/photo','HarvestsController::workerPortrait/$1',['filter'=>'api-session']);

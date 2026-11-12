@@ -95,6 +95,7 @@ class CatalogController extends BaseController
                 'contracts' => ['client_id'=>'clients','site_id'=>'sites','service_id'=>'services','billing_unit_id'=>'units','payment_unit_id'=>'units'],
                 'harvests' => ['client_id'=>'clients','site_id'=>'sites','service_id'=>'services','billing_unit_id'=>'units','payment_unit_id'=>'units'],
                 'harvest_movements' => ['worker_id'=>'workers'],
+                'worker_portraits' => ['worker_id'=>'workers'],
             ] as $other => $fields) {
                 foreach ($fields as $field => $target) {
                     if ($target === $resource && $db->table('agri_' . $other)->where($field, $id)->countAllResults() > 0) { $linked = true; }

@@ -9,6 +9,8 @@ class HarvestsController extends BaseController
  public function startContract(){return $this->run(fn($b)=>$b->startContract($this->request->getJSON(true)??[]));}
  public function workerHistory(string $id){return $this->run(fn()=>['item'=>(new \App\Field\WorkerSafety(db_connect()))->history((int)$id)]);}
  public function workerBlock(string $id){return $this->run(fn()=>(new \App\Field\WorkerSafety(db_connect()))->block((int)$id,$this->request->getJSON(true)??[]));}
+ public function workerPortrait(string $id){return $this->run(fn()=>(new \App\Field\WorkerPortraits(db_connect()))->save((int)$id,$this->request->getFile('photo'),$this->request->getPost()));}
+ public function viewPortrait(string $id){try{$p=(new \App\Field\WorkerPortraits(db_connect()))->get((int)$id);$file=WRITEPATH.'worker-portraits/'.$p['filename'];if(!is_file($file))throw new FieldProblem(404,'Fotografia indisponível.');return $this->response->setHeader('Cache-Control','private, no-store')->setHeader('X-Content-Type-Options','nosniff')->setContentType($p['mime'])->setBody(file_get_contents($file));}catch(FieldProblem $e){return $this->response->setStatusCode($e->status)->setJSON(['error'=>$e->getMessage()]);}}
  public function contracts(){return $this->run(fn($b)=>$b->listing('contracts'));}
  public function createContract(){return $this->run(fn($b)=>$b->createContract($this->request->getJSON(true)??[]));}
  public function index(){return $this->run(fn($b)=>$b->listing('harvests'));}

@@ -55,9 +55,9 @@ final class HarvestTest extends CIUnitTestCase
  {
   $this->validated();$b=new HarvestBook($this->db);try{$b->close($this->harvest,['version'=>1,'ends_on'=>'2026-11-10']);$this->fail('Sem entrega aceite');}catch(FieldProblem $e){$this->assertSame(422,$e->status);}
  }
- public function testQuickWorkerRequiresPhoneAndNoTeam():void
+ public function testQuickWorkerAllowsOptionalPhoneAndNoTeam():void
  {
-  $this->login($this->leader);$this->request('/field/workers',['name'=>'Novo colaborador','phone'=>'+351 912 345 678','is_active'=>true])->assertStatus(201);$this->request('/field/workers',['name'=>'Sem telefone','is_active'=>true])->assertStatus(422);
+  $this->login($this->leader);$this->request('/field/workers',['name'=>'Novo colaborador','phone'=>'+351 912 345 678','is_active'=>true])->assertStatus(201);$this->request('/field/workers',['name'=>'Sem telefone','is_active'=>true])->assertStatus(201);
  }
  public function testDuplicateValidationAndExcessPaymentAreRejected():void
  {

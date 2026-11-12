@@ -8,7 +8,7 @@ class WorkerSafety
   $worker['is_blocked']=(bool)$worker['is_blocked'];$worker['performance_avg']=$q['performance_avg']===null?null:round((float)$q['performance_avg'],2);$worker['evaluation_count']=(int)$q['evaluation_count'];$worker['low_performance']=$worker['performance_avg']!==null&&$worker['performance_avg']<3;return $worker;
  }
  public function history(int $id):array{
-  FieldAccess::requireField();$w=$this->db->table('agri_workers')->select('id,name,is_active,is_blocked,block_reason,version')->where('id',$id)->get()->getRowArray();if(!$w)throw new FieldProblem(404,'Trabalhador não encontrado.');
+  FieldAccess::requireField();$w=$this->db->table('agri_workers')->select('id,name,is_active,is_blocked,block_reason,version,photo_version')->where('id',$id)->get()->getRowArray();if(!$w)throw new FieldProblem(404,'Trabalhador não encontrado.');
   $w=$this->summary($w);$w['evaluations']=$this->db->table('agri_work_log_attendees a')->select('l.work_date,l.service_name,a.score,a.notes')->join('agri_work_logs l','l.id=a.work_log_id')->where('a.worker_id',$id)->where('a.present',1)->where('a.score !=',null)->whereIn('l.status',['closed','submitted'])->orderBy('l.work_date','DESC')->orderBy('l.id','DESC')->get(20)->getResultArray();return $w;
  }
  public function block(int $id,array $in):array{

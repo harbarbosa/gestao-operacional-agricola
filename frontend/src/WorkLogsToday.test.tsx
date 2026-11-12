@@ -11,7 +11,7 @@ beforeEach(()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});host=d
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.clearAllMocks()})
 it('abre o rascunho de hoje na própria tela e guarda antes de encerrar',async()=>{
  await act(async()=>root.render(<WorkLogs todayMode onSessionExpired={vi.fn()} onBusyChange={vi.fn()}/>))
- expect(document.querySelector('dialog')).toBeNull();expect(host.querySelector('.field-workspace')).not.toBeNull();expect(host.querySelector('[aria-label="Produção de Ana"]')).not.toBeNull()
+ expect(document.querySelector('dialog')).toBeNull();expect(host.querySelector('.field-workspace')).not.toBeNull();expect(host.querySelector('[aria-label="Abrir trabalhador Ana"]')).not.toBeNull();expect(host.querySelector('.quantity-stepper')).toBeNull()
  await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Encerrar dia')!.click())
  const calls=vi.mocked(api).mock.calls;const saved=calls.findIndex(([p,o])=>p==='/work-logs/1'&&o?.method==='PUT');const submitted=calls.findIndex(([p,o])=>p==='/work-logs/1/submit'&&o?.method==='POST');expect(saved).toBeGreaterThan(-1);expect(submitted).toBeGreaterThan(saved)
  expect(JSON.parse(String(calls[submitted][1]?.body))).toEqual({version:2})

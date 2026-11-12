@@ -38,3 +38,9 @@ export function maskPhone(value: string) {
 
 export function formatCents(value: string | number) { const negative = String(value).startsWith('-'); const text = String(value).replace('-', '').padStart(3, '0'); return formatCurrency((negative ? '-' : '') + text.slice(0, -2) + '.' + text.slice(-2)) }
 export function statusLabel(status: string) { return ({draft:'Rascunho',canceled:'Cancelado',closed:'Validado',submitted:'Por validar'} as Record<string,string>)[status] ?? status }
+
+export function maskWorkerPhone(value:string){
+ let digits=value.replace(/^\s*(?:\+351|00351)\s*/,'').replace(/\D/g,'')
+ if(digits.length===12&&digits.startsWith('351'))digits=digits.slice(3)
+ return digits.slice(0,15).replace(/(\d{3})(?=\d)/g,'$1 ').trim()
+}

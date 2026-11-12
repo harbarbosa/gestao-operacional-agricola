@@ -11,7 +11,7 @@ A preparação guarda contratos, trabalhadores (incluindo alertas e histórico r
 
 ## Durante o trabalho
 
-**Novo trabalho** seleciona contrato e data. Os cards permitem produção e notas de 1 a 5; o formulário de participante não pede entrada/saída. Grupos têm produção conjunta e seleção de participantes. Novos trabalhadores são cadastrados com nome completo e telefone, incluindo sem rede. As fotografias podem ser guardadas antes do primeiro envio do trabalho (JPG/PNG/WebP até 5 MB).
+**Novo trabalho** seleciona contrato e data. Ao tocar no card abre o formulário para produção e notas de 1 a 5; o formulário de participante não pede entrada/saída. Grupos têm produção conjunta e seleção de participantes. Novos trabalhadores são cadastrados com nome completo, telefone opcional sem prefixo automático e fotografia opcional, incluindo sem rede. A fotografia do trabalhador aparece no card e é sincronizada separadamente das fotos de produção. As fotografias podem ser guardadas antes do primeiro envio do trabalho (JPG/PNG/WebP até 5 MB).
 
 As alterações são gravadas no IndexedDB do dispositivo, com confirmação de gravação. Se o armazenamento falhar ou ficar sem espaço, aparece um erro; não tratar esse erro como uma gravação concluída. O navegador pode eliminar dados se o utilizador limpar o armazenamento da aplicação: manter os dados da aplicação até concluir os envios.
 
@@ -38,3 +38,5 @@ Se a sessão expirar, entrar novamente com a mesma conta e sincronizar. A saída
 - Operações: `POST /api/v1/field/offline/apply`, recibos `agri_offline_receipts` por ator e UUID.
 - Fotografias: endpoint existente aceita UUID e guarda fotografia/recibo na mesma transação, com validação de imagem e acesso.
 - Service worker guarda apenas a aplicação e os ícones; não guarda respostas autenticadas da API em cache HTTP.
+
+A área Conta permite alterar a palavra-passe com ligação à internet, mediante confirmação da palavra-passe atual e da nova. As outras sessões são invalidadas.

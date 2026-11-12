@@ -29,7 +29,7 @@ final class UsersTest extends CIUnitTestCase
     private function write(string $path, array $data, string $method = 'post')
     {
         $token = csrf_hash(); session()->set(config('Security')->tokenName, $token);
-        return $this->withSession()->withHeaders(['X-CSRF-TOKEN' => $token, 'X-Requested-With' => 'XMLHttpRequest'])->withBodyFormat('json')->{$method}('/api/v1/users' . $path, $data);
+        return $this->withSession()->withHeaders(['X-CSRF-TOKEN' => $token, 'X-Requested-With' => 'XMLHttpRequest'])->withBodyFormat('json')->{$method}(($path === '/auth/password' ? '/api/v1' : '/api/v1/users') . $path, $data);
     }
     private function data(array $changes = []): array { return array_replace(['username' => 'newuser', 'email' => 'new@example.test', 'password' => 'SafePassword123!', 'role' => 'worker', 'active' => true, 'permissions' => []], $changes); }
     public function testCreateAccountAndAssignOnlyExplicitAccess(): void
@@ -91,4 +91,25 @@ final class UsersTest extends CIUnitTestCase
         $this->withSession()->get('/api/v1/users')->assertStatus(200); $this->withSession()->get('/api/v1/users/metadata')->assertStatus(200);
         $this->write('', $this->data())->assertStatus(403);
     }
+    public function testOwnPasswordRequiresTheCurrentPassword():void
+    {
+        $this->write('/auth/password',['current_password'=>'WrongPassword!','new_password'=>'NewPassword123!','confirmation'=>'NewPassword123!'])->assertStatus(422);
+        $hash=$this->db->table('auth_identities')->where('user_id',$this->actor)->where('type','email_password')->get()->getRowArray()['secret2'];$this->assertTrue(service('passwords')->verify('ExamplePassword123!',$hash));
+    }
+    public function testOwnPasswordCannotChangeAnotherAccountOrAcceptWeakConfirmation():void
+    {
+        $this->write('/auth/password',['current_password'=>'ExamplePassword123!','new_password'=>'short','confirmation'=>'different','user_id'=>999])->assertStatus(422);
+        $this->assertSame(0,$this->db->table('agri_user_audit')->where('action','password')->countAllResults());
+    }
+    public function testPasswordChangePreservesCurrentSessionAndInvalidatesOtherVersions():void
+    {
+        $this->write('/auth/password',['current_password'=>'ExamplePassword123!','new_password'=>'NewPassword123!','confirmation'=>'NewPassword123!'])->assertStatus(200);
+        $hash=$this->db->table('auth_identities')->where('user_id',$this->actor)->where('type','email_password')->get()->getRowArray()['secret2'];$this->assertTrue(service('passwords')->verify('NewPassword123!',$hash));$this->assertFalse(service('passwords')->verify('ExamplePassword123!',$hash));
+        $this->withSession()->get('/api/v1/auth/me')->assertStatus(200);$audit=$this->db->table('agri_user_audit')->where('action','password')->get()->getRowArray();$this->assertSame(1,(int)$audit['password_changed']);$this->assertStringNotContainsString('NewPassword123!',json_encode($audit));session()->set('agri_user_security_version',1);$this->withSession()->get('/api/v1/auth/me')->assertStatus(401);
+    }
+    public function testAnonymousCannotChangePassword():void
+    {
+        auth('session')->logout();$this->write('/auth/password',['current_password'=>'ExamplePassword123!','new_password'=>'NewPassword123!','confirmation'=>'NewPassword123!'])->assertStatus(401);
+    }
+
 }

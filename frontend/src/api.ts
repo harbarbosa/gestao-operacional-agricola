@@ -1,4 +1,4 @@
-import {offlineMode,offlineRead,createLocalWorker,rememberOfflineUser,offlineUser,deactivateOffline} from './offlineStore'
+import {offlineMode,storeWorkerPhoto,offlineRead,createLocalWorker,rememberOfflineUser,offlineUser,deactivateOffline} from './offlineStore'
 export interface CurrentUser {
   id: number
   username: string
@@ -36,8 +36,10 @@ export async function networkApi<T>(path: string, options: RequestInit = {}): Pr
 }
 
 export async function api<T>(path:string,options:RequestInit={}):Promise<T>{
+  const portrait=path.match(/^\/workers\/(-?\d+)\/photo$/)
+  if(offlineMode()&&portrait&&options.method==='POST'&&options.body instanceof FormData)return await storeWorkerPhoto(Number(portrait[1]),options.body) as T
   if(offlineMode()&&path==='/field/workers'&&options.method==='POST'){
-    const input=JSON.parse(String(options.body));return await createLocalWorker({name:input.name,phone:input.phone}) as T
+    const input=JSON.parse(String(options.body));return await createLocalWorker({name:input.name,phone:input.phone??''}) as T
   }
   if(offlineMode()&&!options.method){const cached=await offlineRead(path);if(cached!==undefined)return cached as T}
   try{

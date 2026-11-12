@@ -6,7 +6,7 @@ class FieldCatalogController extends CatalogController
 {
     public function createWorker()
     {
-        try { FieldAccess::requireField(); $input=$this->request->getJSON(true); if(!is_array($input)||!is_string($input['name']??null)||!is_string($input['phone']??null)||strlen(preg_replace('/\D/','',$input['phone']))<9) throw new FieldProblem(422,'Preencha nome completo e telefone.'); if(array_diff(array_keys($input),['name','phone','email','notes','is_active','team_id']))throw new FieldProblem(422,'Campos não permitidos.'); return parent::create('workers'); }
+        try { FieldAccess::requireField(); $input=$this->request->getJSON(true); if(!is_array($input)||!is_string($input['name']??null)||(isset($input['phone'])&&(!is_string($input['phone'])||mb_strlen($input['phone'])>40))) throw new FieldProblem(422,'Preencha o nome completo. O telefone é opcional.'); if(array_diff(array_keys($input),['name','phone','email','notes','is_active','team_id']))throw new FieldProblem(422,'Campos não permitidos.'); return parent::create('workers'); }
         catch(FieldProblem $e) { return $this->response->setStatusCode($e->status)->setJSON(['error'=>$e->getMessage()]); }
     }
     public function options(string $resource,?string $id=null)

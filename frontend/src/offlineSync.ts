@@ -10,6 +10,8 @@ async function perform(owner:number){
  const workers=await offlineDb.workers.where('owner').equals(owner).toArray()
  for(const w of workers)if(!w.remoteId){try{const r=await networkApi<{item:{id:number}}>('/field/offline/apply',{method:'POST',body:JSON.stringify({kind:'worker',request_id:w.requestId,payload:{name:w.name,phone:w.phone}})});await offlineDb.workers.update(w.id,{remoteId:r.item.id,error:undefined})}catch(e){await offlineDb.workers.update(w.id,{error:message(e)});throw e}}
  const mapping=new Map((await offlineDb.workers.where('owner').equals(owner).toArray()).map(w=>[w.id,w.remoteId]))
+ const portraits=await offlineDb.portraits.where('owner').equals(owner).toArray()
+ for(const p of portraits.filter(p=>!p.synced)){try{const worker=p.workerId<0?mapping.get(p.workerId):p.workerId;if(!worker)throw Error('Trabalhador ainda pendente de envio.');const form=new FormData();form.append('photo',p.blob,'worker.jpg');form.append('request_id',p.requestId);form.append('version',String(p.remoteVersion));const r=await networkApi<{photo_version:number}>(`/workers/${worker}/photo`,{method:'POST',body:form});await offlineDb.portraits.update(p.key,{remoteVersion:r.photo_version,synced:true,error:undefined})}catch(error){await offlineDb.portraits.update(p.key,{error:message(error)});if(error instanceof TypeError||error instanceof ApiError&&error.status===401)throw error}}
  const drafts=await offlineDb.drafts.where('owner').equals(owner).sortBy('updated')
  for(const captured of drafts){if(activeOwner()!==owner)throw Error('A conta mudou durante o envio.');let draft=await offlineDb.drafts.get(captured.id);if(!draft||draft.status!=='draft'||draft.error)continue
   try{
