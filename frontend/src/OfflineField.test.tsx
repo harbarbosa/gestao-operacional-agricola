@@ -4,6 +4,7 @@ import {act} from 'react'
 import {createRoot,type Root} from 'react-dom/client'
 import {beforeEach,afterEach,expect,it,vi} from 'vitest'
 import OfflineField from './OfflineField'
+import {networkApi} from './api'
 import {offlineDb,rememberOfflineUser} from './offlineStore'
 vi.mock('./api',async original=>({...await original<typeof import('./api')>(),networkApi:vi.fn()}))
 vi.mock('./Participants',()=>({default:({rows,onChange}:{rows:{worker:string;quantity:string}[];onChange:(r:unknown[])=>void})=><section>{rows.map(r=><p key={r.worker}>Ana · {r.quantity} caixas</p>)}<button onClick={()=>onChange([...rows,{key:'a',worker:'1',present:true,timeIn:'',timeOut:'',nextDay:false,quantity:'10',score:'4',notes:''}])}>Adicionar Ana</button></section>}))
@@ -20,4 +21,14 @@ it('cria e reabre o trabalho sem rede com gravação automática dos participant
  expect((await offlineDb.drafts.where('owner').equals(3).first())?.rows[0].quantity).toBe('10')
  await act(async()=>root.unmount());root=createRoot(host);await act(async()=>root.render(<OfflineField user={user} onSessionExpired={vi.fn()}/>));await settle()
  expect(host.textContent).toContain('Ana · 10 caixas');expect(host.textContent).toContain('Guardado no dispositivo')
+})
+
+it('carrega os dados automaticamente na primeira abertura sem botões de preparação',async()=>{
+ const snapshot=await offlineDb.snapshots.get(3);await offlineDb.snapshots.clear();vi.stubGlobal('navigator',{onLine:true});vi.mocked(networkApi).mockImplementation(async path=>path==='/auth/me'?{user}:snapshot);
+ await act(async()=>root.render(<OfflineField user={user} onSessionExpired={vi.fn()}/>));await settle();await settle();
+ expect(networkApi).toHaveBeenCalledWith('/field/offline');expect(await offlineDb.snapshots.get(3)).toBeDefined();expect(host.textContent).toContain('Novo trabalho');expect(host.textContent).not.toContain('Preparar para');expect([...host.querySelectorAll('button')].some(b=>b.textContent==='Sincronizar')).toBe(false)
+})
+it('recuperar a ligação atualiza os dados automaticamente',async()=>{
+ const snapshot=await offlineDb.snapshots.get(3);vi.mocked(networkApi).mockReset();vi.mocked(networkApi).mockImplementation(async path=>path==='/auth/me'?{user}:snapshot);
+ await act(async()=>root.render(<OfflineField user={user} onSessionExpired={vi.fn()}/>));await settle();expect(networkApi).not.toHaveBeenCalled();vi.stubGlobal('navigator',{onLine:true});await act(async()=>window.dispatchEvent(new Event('online')));await settle();await settle();expect(networkApi).toHaveBeenCalledWith('/field/offline');expect(host.textContent).toContain('Com ligação')
 })
