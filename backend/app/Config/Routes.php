@@ -81,3 +81,6 @@ $routes->get('api/v1/production-photos/([1-9][0-9]*)','HarvestsController::photo
 $routes->post('api/v1/contracts/start','HarvestsController::startContract',['filter'=>'api-session']);
 $routes->get('api/v1/workers/([1-9][0-9]*)/history','HarvestsController::workerHistory/$1',['filter'=>'api-session']);
 $routes->post('api/v1/workers/([1-9][0-9]*)/block','HarvestsController::workerBlock/$1',['filter'=>'api-session']);
+
+$routes->get('api/v1/field/offline','OfflineController::snapshot',['filter'=>'api-session']);
+$routes->post('api/v1/field/offline/apply','OfflineController::apply',['filter'=>'api-session']);

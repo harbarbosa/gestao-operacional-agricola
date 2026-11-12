@@ -38,3 +38,6 @@ Consultar [Operação Agroperi](docs/AGROPERI_PRODUCAO.md).
 
 ## Contratos e colheitas
 Consultar [Operação diária, entregas e fluxo financeiro](docs/COLHEITAS.md).
+
+## Operação offline
+Consultar [Preparação e sincronização no campo](docs/OFFLINE.md).

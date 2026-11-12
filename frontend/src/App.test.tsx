@@ -6,6 +6,7 @@ import App from './App'
 import {api} from './api'
 vi.mock('./api',async original=>({...await original<typeof import('./api')>(),api:vi.fn()}))
 vi.mock('./Dashboard',()=>({default:()=> <div>Painel</div>}))
+vi.mock('./OfflineField',()=>({default:()=> <div>Trabalho de hoje</div>}))
 vi.mock('./WorkLogs',()=>({default:()=> <div>Trabalho de hoje</div>}))
 vi.mock('./Reports',()=>({default:()=> <div>Conteúdo dos relatórios</div>}))
 let root:Root;let host:HTMLDivElement

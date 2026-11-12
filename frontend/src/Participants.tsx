@@ -7,16 +7,17 @@ import {formatNumber,maskDecimal} from './locale'
 import type {AttendeeForm} from './field'
 
 type Pool={pool_key:string;name:string;quantity:string}
-type Props={rows:AttendeeForm[];onChange:(rows:AttendeeForm[])=>void;pools:Pool[];unit:string;disabled:boolean;canAdd:boolean;initialNames:Record<string,string>;onPhoto?:(worker:string)=>void;onNamesChange?:(names:Record<string,string>)=>void}
-export default function Participants({rows,onChange,pools,unit,disabled,canAdd,initialNames,onPhoto,onNamesChange}:Props){
+type Props={rows:AttendeeForm[];onChange:(rows:AttendeeForm[])=>void;pools:Pool[];unit:string;disabled:boolean;canAdd:boolean;initialNames:Record<string,string>;onPhoto?:(worker:string)=>void;onNamesChange?:(names:Record<string,string>)=>void;preparedWorkers?:Record<string,WorkerInfo>}
+export default function Participants({rows,onChange,pools,unit,disabled,canAdd,initialNames,onPhoto,onNamesChange,preparedWorkers}:Props){
  const [history,setHistory]=useState<number|null>(null)
- const [info,setInfo]=useState<Record<string,WorkerInfo>>({})
+ const [fetchedInfo,setInfo]=useState<Record<string,WorkerInfo>>({})
+ const info=preparedWorkers??fetchedInfo
  const [editing,setEditing]=useState<AttendeeForm|null>(null)
  const [names,setNames]=useState<Record<string,string>>(initialNames)
  const [message,setMessage]=useState('')
  const ids=[...new Set(rows.map(row=>row.worker).filter(Boolean))].join(',')
- useEffect(()=>{let active=true;for(const id of ids.split(',').filter(Boolean))api<{item:WorkerInfo}>(`/field/options/workers/${id}`).then(r=>{if(active){setNames(old=>({...old,[id]:r.item.name}));onNamesChange?.({[id]:r.item.name});setInfo(old=>({...old,[id]:r.item}))}}).catch(()=>{});return()=>{active=false}},[ids])
- useEffect(()=>{let active=true;if(editing?.worker)api<{item:WorkerInfo}>(`/field/options/workers/${editing.worker}`).then(r=>{if(active)setInfo(old=>({...old,[editing.worker]:r.item}))}).catch(()=>{});return()=>{active=false}},[editing?.worker])
+ useEffect(()=>{if(preparedWorkers)return;let active=true;for(const id of ids.split(',').filter(Boolean))api<{item:WorkerInfo}>(`/field/options/workers/${id}`).then(r=>{if(active){setNames(old=>({...old,[id]:r.item.name}));onNamesChange?.({[id]:r.item.name});setInfo(old=>({...old,[id]:r.item}))}}).catch(()=>{});return()=>{active=false}},[ids])
+ useEffect(()=>{if(preparedWorkers)return;let active=true;if(editing?.worker)api<{item:WorkerInfo}>(`/field/options/workers/${editing.worker}`).then(r=>{if(active)setInfo(old=>({...old,[editing.worker]:r.item}))}).catch(()=>{});return()=>{active=false}},[editing?.worker])
 
  function add(){setMessage('');setEditing({key:crypto.randomUUID(),worker:'',present:true,timeIn:'',timeOut:'',nextDay:false,quantity:'',score:'',notes:'',poolKey:''})}
  function update(changes:Partial<AttendeeForm>){setEditing(old=>old?{...old,...changes}:null)}
@@ -35,8 +36,6 @@ export default function Participants({rows,onChange,pools,unit,disabled,canAdd,i
  {row&&<Modal title={rows.some(r=>r.key===row.key)?'Editar participante':'Adicionar participante'} busy={disabled} onClose={()=>setEditing(null)}><form className="record-form" onSubmit={apply}><fieldset disabled={busy}>
       <label htmlFor={`worker-${row.key}`}>Trabalhador</label><ReferenceField field={{ key: `worker-${row.key}`, label: 'Trabalhador', resource: 'workers', source: 'field', required: true }} value={row.worker} onChange={value => update({ worker: value })} disabled={busy} />
       <label className="checkbox"><input type="checkbox" checked={row.present} onChange={e => update({ present: e.target.checked, ...(!e.target.checked ? { timeIn: '', timeOut: '', nextDay: false, quantity: '', score: '', poolKey: '' } : {}) })} />Presente</label>
-      <div className="field-grid"><div><label htmlFor={`in-${row.key}`}>Entrada</label><input id={`in-${row.key}`} type="time" lang="pt-PT" value={row.timeIn} disabled={!row.present} onChange={e => update({ timeIn: e.target.value })} /></div><div><label htmlFor={`out-${row.key}`}>Saída</label><input id={`out-${row.key}`} type="time" lang="pt-PT" value={row.timeOut} disabled={!row.present} onChange={e => update({ timeOut: e.target.value })} /></div></div>
-      <label className="checkbox"><input type="checkbox" checked={row.nextDay} disabled={!row.present} onChange={e => update({ nextDay: e.target.checked })} />Saída no dia seguinte</label>
       {pools.length > 0 && <><label htmlFor={`group-${row.key}`}>Grupo de produção</label><select id={`group-${row.key}`} value={row.poolKey ?? ''} disabled={!row.present} onChange={event => update({poolKey:event.target.value,quantity:''})}><option value="">Produção individual</option>{pools.map(pool=><option key={pool.pool_key} value={pool.pool_key}>{pool.name} · divisão igual</option>)}</select></>}
       <label htmlFor={`quantity-${row.key}`}>Quantidade ({context?.payment ?? 'unidade a confirmar'})</label><input id={`quantity-${row.key}`} inputMode="decimal" maxLength={20} value={row.quantity} disabled={!row.present || !context || !!row.poolKey} onChange={e => update({ quantity: maskDecimal(e.target.value) })} />
       <label htmlFor={`score-${row.key}`}>Nota de desempenho (1 a 5)</label><select id={`score-${row.key}`} value={row.score} disabled={!row.present} onChange={e => update({ score: e.target.value })}><option value="">A avaliar</option>{[1, 2, 3, 4, 5].map(score => <option key={score} value={score}>{score}</option>)}</select>

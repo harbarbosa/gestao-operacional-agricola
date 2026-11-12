@@ -26,12 +26,12 @@ O administrador fecha a colheita no final, após validar os dias e associar a pr
 
 Controladores têm acesso às colheitas atribuídas. Preços, alocações financeiras, movimentos e resumos monetários não são enviados nas respostas operacionais. Fotos ficam fora da pasta pública e são servidas após autenticação e verificação de acesso. JPG/PNG/WebP até 5 MB.
 
-A migração é aditiva, preserva o histórico e torna opcional a equipa dos diários. Fazer backup da base e aplicação antes de aplicar as migrações. O funcionamento autenticado sem internet e a sincronização de fotografias continuam como etapa separada: esta versão requer ligação ao servidor para gravar.
+A migração é aditiva, preserva o histórico e torna opcional a equipa dos diários. Fazer backup da base e aplicação antes de aplicar as migrações. A operação do controlador funciona offline após preparação; consultar [Preparação e sincronização](OFFLINE.md).
 
 ## Simplificação de novembro de 2026
 
 A interface usa apenas **Contrato**: o formulário cria de uma vez as condições comerciais e a operação, sem atribuição de controlador. Contratos antigos são preservados; condições antigas ainda sem operação ganham automaticamente um registo operacional. O controlador identifica-se ao abrir o trabalho diário e pode escolher qualquer contrato ativo, mas só consulta/edita os seus próprios trabalhos. A administração mantém a visão completa.
 
-O controlador entra diretamente em **Hoje**, com **Histórico** e **Conta** na navegação. Produção e nota ficam nos cards; horários/observações ficam nos detalhes. O cadastro rápido continua a pedir nome completo e telefone. **Guardar** mantém o dia editável; **Encerrar dia** guarda e envia para validação. Fotografias ficam acessíveis após a primeira gravação.
+O controlador entra diretamente em **Hoje**, com **Histórico** e **Conta** na navegação. Produção e nota ficam nos cards; observações ficam nos detalhes; não são pedidos horários. O cadastro rápido continua a pedir nome completo e telefone. **Guardar** mantém o dia editável; **Encerrar dia** guarda e envia para validação. Na tela offline, fotografias podem ser guardadas no dispositivo e enviadas após o trabalho.
 
 A seleção e os cards mostram média, número de avaliações e histórico recente (até 20). A média abaixo de 3/5 gera alerta, nunca bloqueio automático. Rascunhos e cancelamentos não contam; avaliações de dias enviados ou validados contam, excluindo presenças sem nota. A administração bloqueia/desbloqueia na ficha de histórico do trabalhador, com motivo obrigatório e auditoria. O servidor impede associar trabalhador bloqueado e encerrar/validar um dia que o mantenha como presente. Atividades já validadas, produção e pagamentos existentes são preservados.
