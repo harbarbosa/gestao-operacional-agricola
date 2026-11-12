@@ -63,3 +63,28 @@ $routes->get('api/v1/settlements/options/workers', 'ReportsController::options/w
 $routes->get('api/v1/settlements/options/workers/([1-9][0-9]*)', 'ReportsController::options/workers/$1', ['filter'=>'api-session:finance.manage']);
 
 $routes->get('api/v1/settlements/summary', 'ProductionController::summary', ['filter'=>'api-session:finance.manage']);
+
+$harvest=['filter'=>'api-session'];
+$routes->get('api/v1/contracts','HarvestsController::contracts',$harvest);
+$routes->post('api/v1/contracts','HarvestsController::createContract',$harvest);
+$routes->get('api/v1/harvests','HarvestsController::index',$harvest);
+$routes->post('api/v1/harvests','HarvestsController::create',$harvest);
+$routes->get('api/v1/harvests/([1-9][0-9]*)','HarvestsController::show/$1',$harvest);
+$routes->post('api/v1/harvests/([1-9][0-9]*)/deliveries','HarvestsController::delivery/$1',$harvest);
+$routes->post('api/v1/harvests/([1-9][0-9]*)/movements','HarvestsController::movement/$1',$harvest);
+$routes->post('api/v1/harvests/([1-9][0-9]*)/close','HarvestsController::close/$1',$harvest);
+$routes->post('api/v1/work-logs/([1-9][0-9]*)/(submit|validate|return)','HarvestsController::daily/$1/$2',$harvest);
+$routes->get('api/v1/work-logs/([1-9][0-9]*)/photos','HarvestsController::photos/$1',$harvest);
+$routes->post('api/v1/work-logs/([1-9][0-9]*)/photos','HarvestsController::upload/$1',$harvest);
+$routes->get('api/v1/production-photos/([1-9][0-9]*)','HarvestsController::photo/$1',$harvest);
+
+$routes->post('api/v1/contracts/start','HarvestsController::startContract',['filter'=>'api-session']);
+$routes->get('api/v1/workers/([1-9][0-9]*)/history','HarvestsController::workerHistory/$1',['filter'=>'api-session']);
+$routes->post('api/v1/workers/([1-9][0-9]*)/block','HarvestsController::workerBlock/$1',['filter'=>'api-session']);
+
+$routes->get('api/v1/field/offline','OfflineController::snapshot',['filter'=>'api-session']);
+$routes->post('api/v1/field/offline/apply','OfflineController::apply',['filter'=>'api-session']);
+
+$routes->post('api/v1/auth/password','AuthController::password',['filter'=>'api-session']);
+$routes->get('api/v1/workers/([1-9][0-9]*)/photo','HarvestsController::viewPortrait/$1',['filter'=>'api-session']);
+$routes->post('api/v1/workers/([1-9][0-9]*)/photo','HarvestsController::workerPortrait/$1',['filter'=>'api-session']);

@@ -6,7 +6,7 @@ class FieldCatalogController extends CatalogController
 {
     public function createWorker()
     {
-        try { FieldAccess::requireField(); $input=$this->request->getJSON(true); if(!is_array($input)||!is_int($input['team_id']??null)) throw new FieldProblem(422,'Selecione a equipa.'); FieldAccess::check($input['team_id']); if(isset($input['is_active'])&&$input['is_active']!==true) throw new FieldProblem(422,'O novo trabalhador deve estar ativo.'); return parent::create('workers'); }
+        try { FieldAccess::requireField(); $input=$this->request->getJSON(true); if(!is_array($input)||!is_string($input['name']??null)||(isset($input['phone'])&&(!is_string($input['phone'])||mb_strlen($input['phone'])>40))) throw new FieldProblem(422,'Preencha o nome completo. O telefone é opcional.'); if(array_diff(array_keys($input),['name','phone','email','notes','is_active','team_id']))throw new FieldProblem(422,'Campos não permitidos.'); return parent::create('workers'); }
         catch(FieldProblem $e) { return $this->response->setStatusCode($e->status)->setJSON(['error'=>$e->getMessage()]); }
     }
     public function options(string $resource,?string $id=null)
@@ -23,12 +23,12 @@ class FieldCatalogController extends CatalogController
             }
             $builder=$db->table('agri_'.$resource);
             if($resource==='teams'&&!FieldAccess::manager())$builder->whereIn('id',FieldAccess::teamIds()?:[0]);
-            if($id) { $item=$builder->where('id',(int)$id)->get()->getRowArray(); if(!$item) throw new FieldProblem(404,'Opção não encontrada.'); $item['id']=(int)$item['id'];$item['version']=(int)$item['version'];$item['is_active']=(bool)$item['is_active']; return $this->response->setJSON(['item'=>$item]); }
+            if($id) { $item=$builder->where('id',(int)$id)->get()->getRowArray(); if(!$item) throw new FieldProblem(404,'Opção não encontrada.'); $item['id']=(int)$item['id'];$item['version']=(int)$item['version'];$item['is_active']=(bool)$item['is_active']; if($resource==='workers')$item=(new \App\Field\WorkerSafety($db))->summary($item);return $this->response->setJSON(['item'=>$item]); }
             $query=$this->request->getGet('q')??''; if(!is_string($query)||mb_strlen($query)>160) throw new FieldProblem(422,'Pesquisa inválida.'); if($query!=='')$builder->like('name',$query);
             if($resource==='sites' && ($client=$this->request->getGet('client_id'))!==null) { if(!is_string($client)||!ctype_digit($client)||(int)$client<1) throw new FieldProblem(422,'Cliente inválido.'); $builder->where('client_id',(int)$client); }
             $total=$builder->countAllResults(false); $items=$builder->orderBy('name')->get(25)->getResultArray();
             foreach($items as &$item) { $item['id']=(int)$item['id'];$item['version']=(int)$item['version'];$item['is_active']=(bool)$item['is_active'];
-                if($resource==='workers') { $quality=$db->table('agri_work_log_attendees a')->select('AVG(a.score) AS performance_avg, COUNT(*) AS evaluation_count')->join('agri_work_logs l','l.id=a.work_log_id')->where('a.worker_id',$item['id'])->where('a.present',1)->where('l.status','closed')->get()->getRowArray();$item+=$quality; }
+                if($resource==='workers') $item=(new \App\Field\WorkerSafety($db))->summary($item);
             }
             return $this->response->setJSON(['items'=>$items,'total'=>$total,'page'=>1,'pageSize'=>25]);
         } catch(FieldProblem $e) { return $this->response->setStatusCode($e->status)->setJSON(['error'=>$e->getMessage()]); }

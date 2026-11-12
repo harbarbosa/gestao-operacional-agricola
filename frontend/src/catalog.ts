@@ -16,7 +16,6 @@ export const catalogs: Record<Resource, { label: string; fields: Field[] }> = {
     { key: 'name', label: 'Nome', required: true, max: 160 },
     { key: 'email', label: 'Email', type: 'email', max: 254 },
     { key: 'phone', label: 'Telefone', max: 40 },
-    { key: 'team_id', label: 'Equipa', type: 'reference', resource: 'teams' },
     { key: 'notes', label: 'Observações', type: 'textarea', max: 2000 },
   ] },
   teams: { label: 'Equipas', fields: [
