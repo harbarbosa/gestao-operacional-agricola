@@ -49,3 +49,13 @@ export async function storeWorkerPhoto(workerId:number,form:FormData){
  const user=await offlineUser();if(!user)throw Error('Inicie sessão com internet antes de guardar fotografias offline.');const blob=form.get('photo');if(!(blob instanceof Blob)||blob.size>1024*1024||!['image/jpeg','image/png','image/webp'].includes(blob.type))throw Error('Fotografia inválida.');
  await offlineDb.portraits.put({key:`${user.id}:${workerId}`,owner:user.id,workerId,blob,requestId:String(form.get('request_id')),remoteVersion:Number(form.get('version')),synced:false});notifyOffline();return {photo_version:Number(form.get('version'))+1}
 }
+
+export async function availableOfflineUsers(){
+ if(typeof indexedDB==='undefined')return []
+ return (await offlineDb.profiles.toArray()).filter(p=>p.expires>Date.now()&&p.user.permissions.includes('field.record')).map(p=>p.user)
+}
+export async function resumeOfflineUser(owner:number){
+ const p=await offlineDb.profiles.get(owner)
+ if(!p||p.expires<=Date.now()||!p.user.permissions.includes('field.record'))throw Error('É necessário iniciar sessão com internet neste telemóvel.')
+ localStorage.setItem('agroperi-field-owner',String(owner));return p.user
+}

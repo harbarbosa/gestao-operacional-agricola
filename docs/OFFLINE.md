@@ -42,3 +42,5 @@ Se a sessão expirar, entrar novamente com a mesma conta; o envio retoma automat
 A área Conta permite alterar a palavra-passe com ligação à internet, mediante confirmação da palavra-passe atual e da nova. As outras sessões são invalidadas.
 
 A preparação dos contratos e trabalhadores é automática ao abrir a operação e ao recuperar a ligação. Os registos são enviados automaticamente com a aplicação aberta; o operador não precisa de preparar nem sincronizar manualmente. Na primeira utilização deste telemóvel é necessária ligação para obter os dados.
+
+A sessão previamente autenticada é recuperada imediatamente ao reabrir sem rede. Se aparecer a entrada, **Continuar offline como [nome]** reabre a conta guardada neste telemóvel, sem enviar nem guardar a palavra-passe. O acesso local expira após sete dias e uma rejeição explícita da sessão pelo servidor remove a autorização local dessa conta. A primeira autenticação continua a exigir internet.

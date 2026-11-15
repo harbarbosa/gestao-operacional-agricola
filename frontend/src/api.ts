@@ -1,4 +1,4 @@
-import {offlineMode,storeWorkerPhoto,offlineRead,createLocalWorker,rememberOfflineUser,offlineUser,deactivateOffline} from './offlineStore'
+import {offlineDb,activeOwner,offlineMode,storeWorkerPhoto,offlineRead,createLocalWorker,rememberOfflineUser,offlineUser,deactivateOffline} from './offlineStore'
 export interface CurrentUser {
   id: number
   username: string
@@ -36,6 +36,7 @@ export async function networkApi<T>(path: string, options: RequestInit = {}): Pr
 }
 
 export async function api<T>(path:string,options:RequestInit={}):Promise<T>{
+  if(path==='/auth/me'&&typeof navigator!=='undefined'&&navigator.onLine===false){const user=await offlineUser().catch(()=>null);if(user)return {user} as T}
   const portrait=path.match(/^\/workers\/(-?\d+)\/photo$/)
   if(offlineMode()&&portrait&&options.method==='POST'&&options.body instanceof FormData)return await storeWorkerPhoto(Number(portrait[1]),options.body) as T
   if(offlineMode()&&path==='/field/workers'&&options.method==='POST'){
@@ -48,7 +49,7 @@ export async function api<T>(path:string,options:RequestInit={}):Promise<T>{
     if(path==='/auth/logout')deactivateOffline()
     return result
   }catch(error){
-    if(error instanceof ApiError&&error.status===401&&['/auth/me','/auth/login'].includes(path))deactivateOffline()
+    if(error instanceof ApiError&&error.status===401&&['/auth/me','/auth/login'].includes(path)){if(path==='/auth/me')await offlineDb.profiles.delete(activeOwner()).catch(()=>{});deactivateOffline()}
     if(error instanceof TypeError){
       if(path==='/auth/me'){const user=await offlineUser().catch(()=>null);if(user)return {user} as T}
       if(path==='/auth/logout'){deactivateOffline();return {} as T}

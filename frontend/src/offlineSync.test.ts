@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import {beforeEach,afterAll,expect,it,vi} from 'vitest'
-import {offlineDb,rememberOfflineUser,createLocalWorker,saveLocalDraft,offlineUser,offlineRead,importSnapshot,allWorkers,type DayDraft,type Snapshot} from './offlineStore'
+import {offlineDb,availableOfflineUsers,resumeOfflineUser,deactivateOffline,rememberOfflineUser,createLocalWorker,saveLocalDraft,offlineUser,offlineRead,importSnapshot,allWorkers,type DayDraft,type Snapshot} from './offlineStore'
 import {syncOffline} from './offlineSync'
 import {networkApi,ApiError} from './api'
 vi.mock('./api',async original=>({...await original<typeof import('./api')>(),networkApi:vi.fn()}))
@@ -30,4 +30,8 @@ it('atualizar preparação preserva alterações locais pendentes e atualiza blo
 it('envia a fotografia do trabalhador sem telefone e continua o diário quando a fotografia é recusada',async()=>{
  const worker=(await createLocalWorker({name:'Sem telefone',phone:''})).item;const d=draft();d.rows[0].worker=String(worker.id);await saveLocalDraft(d);const key=`7:${worker.id}`;await offlineDb.portraits.put({key,owner:7,workerId:worker.id,blob:new Blob(['portrait'],{type:'image/jpeg'}),requestId:crypto.randomUUID(),remoteVersion:0,synced:false});const order:string[]=[];
  vi.mocked(networkApi).mockImplementation(async(path,options)=>{if(path==='/auth/me')return {user};if(path==='/workers/42/photo'){order.push('portrait');expect((options?.body as FormData).get('version')).toBe('0');throw new ApiError(409,'Fotografia alterada')}const body=JSON.parse(String(options?.body));order.push(body.kind);if(body.kind==='worker'){expect(body.payload.phone).toBe('');return {item:{id:42}}}if(body.kind==='work')return {item:{id:80,version:1}};return {item:{version:2}}});await syncOffline(7);expect(order).toEqual(['worker','portrait','work','submit']);expect((await offlineDb.drafts.get(d.id))?.status).toBe('submitted');expect((await offlineDb.portraits.get(key))?.error).toBe('Fotografia alterada');expect((await offlineDb.portraits.get(key))?.synced).toBe(false)
+})
+
+it('recupera a conta guardada sem palavra-passe após terminar a sessão local e recusa contas expiradas',async()=>{
+ deactivateOffline();expect(await offlineUser()).toBeNull();expect((await availableOfflineUsers()).map(u=>u.id)).toEqual([7]);expect((await resumeOfflineUser(7)).username).toBe('Campo');expect((await offlineUser())?.id).toBe(7);await offlineDb.profiles.update(7,{expires:Date.now()-1});expect(await availableOfflineUsers()).toEqual([]);await expect(resumeOfflineUser(7)).rejects.toThrow('internet');await expect(resumeOfflineUser(99)).rejects.toThrow('internet');expect(JSON.stringify(await offlineDb.profiles.toArray())).not.toContain('password')
 })

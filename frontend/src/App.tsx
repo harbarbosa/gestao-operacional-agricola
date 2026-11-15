@@ -5,7 +5,7 @@ import Catalog from './Catalog'
 import Prices from './Prices'
 import WorkLogs from './WorkLogs'
 import OfflineField from './OfflineField'
-import {deactivateOffline} from './offlineStore'
+import {deactivateOffline,availableOfflineUsers,resumeOfflineUser} from './offlineStore'
 import Users from './Users'
 import Reports from './Reports'
 import Finance from './Finance'
@@ -22,6 +22,10 @@ import Account from './Account'
 
 export default function App() {
   const [user, setUser] = useState<CurrentUser | null>(null)
+  const [offlineAccounts,setOfflineAccounts]=useState<CurrentUser[]>([])
+  const [online,setOnline]=useState(navigator.onLine)
+  useEffect(()=>{const refresh=()=>{setOnline(navigator.onLine);void availableOfflineUsers().then(setOfflineAccounts).catch(()=>{})};refresh();window.addEventListener('online',refresh);window.addEventListener('offline',refresh);return()=>{window.removeEventListener('online',refresh);window.removeEventListener('offline',refresh)}},[])
+  async function enterOffline(id:number){try{setUser(await resumeOfflineUser(id));setResource('work-logs');setMessage('')}catch(e){setMessage(e instanceof Error?e.message:'Não foi possível abrir a sessão guardada.')}}
   const [checking, setChecking] = useState(true)
   const [busy, setBusy] = useState(false)
   const [email, setEmail] = useState('')
@@ -34,6 +38,7 @@ export default function App() {
   useEffect(() => {
     let active = true
     api<{ user: CurrentUser }>('/auth/me').then(data => { if (active) setUser(data.user) }).catch(error => {
+      if(active&&error instanceof TypeError)setOnline(false)
       if (active && (!(error instanceof ApiError) || error.status !== 401)) setMessage('Sem ligação ao servidor. Inicie sessão com internet para continuar.')
     }).finally(() => { if (active) setChecking(false) })
     return () => { active = false }
@@ -72,10 +77,10 @@ export default function App() {
   const title = navigation.find(item => item.key === resource)?.label ?? 'Visão geral'
   function navigate(key: string) { setMobileMenu(false); setResource(key as typeof resource); setMessage('') }
   if (checking) return <main className="login-page"><Brand /><p role="status">A verificar sessão…</p></main>
-  if (!user) return <main className="login-page"><div className="login-intro"><Brand /><p className="eyebrow">GESTÃO WEB · OPERAÇÃO NO CAMPO</p><h1>Toda a operação.<br />Uma só plataforma.</h1><p>Equipas, trabalho e produção, do campo à gestão.</p><div className="leaf-decoration" aria-hidden="true">✦</div></div><section className="card login-card"><span className="eyebrow">BEM-VINDO</span><h2>Iniciar sessão</h2><p>Aceda à sua empresa para continuar.</p><form onSubmit={login}>
+  if (!user) return <main className="login-page"><div className="login-intro"><Brand /><p className="eyebrow">GESTÃO WEB · OPERAÇÃO NO CAMPO</p><h1>Toda a operação.<br />Uma só plataforma.</h1><p>Equipas, trabalho e produção, do campo à gestão.</p><div className="leaf-decoration" aria-hidden="true">✦</div></div><section className="card login-card"><span className="eyebrow">BEM-VINDO</span><h2>Iniciar sessão</h2><p>Aceda à sua empresa para continuar.</p>{!online&&<div><p>Sem internet. Pode continuar com uma conta já utilizada neste telemóvel.</p>{offlineAccounts.map(account=><button key={account.id} type="button" onClick={()=>void enterOffline(account.id)}>Continuar offline como {account.username}</button>)}{!offlineAccounts.length&&<p>Ligue-se à internet para iniciar sessão pela primeira vez.</p>}</div>}<form onSubmit={login}>
     <label htmlFor="email">Email</label><input id="email" type="email" autoComplete="username" required maxLength={254} value={email} onChange={e => setEmail(e.target.value)} disabled={busy} />
     <label htmlFor="password">Palavra-passe</label><input id="password" type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} disabled={busy} />
-    <button disabled={busy}>{busy ? 'A iniciar…' : 'Entrar na plataforma'}</button></form><p role="status" aria-live="polite">{message}</p></section></main>
+    <button disabled={busy||!online}>{busy ? 'A iniciar…' : 'Entrar na plataforma'}</button></form><p role="status" aria-live="polite">{message}</p></section></main>
   return <CatalogAccess.Provider value={{ canCreate: user.permissions.includes('catalog.manage'), canCreateWorkers: user.permissions.includes('field.record'), onSessionExpired: sessionExpired }}><div className="app-shell">
     <aside className="sidebar"><Brand /><nav aria-label="Menu principal">{navigation.map(item => <button key={item.key} disabled={busy || catalogBusy} aria-current={resource === item.key ? 'page' : undefined} onClick={() => navigate(item.key)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</nav><div className="sidebar-bottom"><span className="connection-dot" /> Gestão operacional agrícola<small>Portugal · Área de gestão</small></div></aside>
     <div className="workspace"><header className="topbar"><button className="mobile-menu-toggle" aria-label="Abrir menu completo" aria-haspopup="dialog" aria-expanded={mobileMenu} disabled={busy || catalogBusy} onClick={() => setMobileMenu(true)}><Icon name="menu" /></button><div><span className="eyebrow">AGROPERI</span><h1>{title}</h1></div><div className="topbar-user"><span className="current-date"><Icon name="calendar" />{new Intl.DateTimeFormat('pt-PT', { dateStyle: 'long', timeZone: 'Europe/Lisbon' }).format(new Date())}</span><button className="avatar" aria-label="Abrir conta" disabled={busy || catalogBusy} onClick={() => navigate('account')}>{user.username.slice(0, 2).toUpperCase()}</button></div></header>
