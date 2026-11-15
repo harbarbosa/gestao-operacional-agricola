@@ -7,7 +7,7 @@ import OfflineField from './OfflineField'
 import {networkApi} from './api'
 import {offlineDb,rememberOfflineUser} from './offlineStore'
 vi.mock('./api',async original=>({...await original<typeof import('./api')>(),networkApi:vi.fn()}))
-vi.mock('./Participants',()=>({default:({rows,onChange}:{rows:{worker:string;quantity:string}[];onChange:(r:unknown[])=>void})=><section>{rows.map(r=><p key={r.worker}>Ana · {r.quantity} caixas</p>)}<button onClick={()=>onChange([...rows,{key:'a',worker:'1',present:true,timeIn:'',timeOut:'',nextDay:false,quantity:'10',score:'4',notes:''}])}>Adicionar Ana</button></section>}))
+vi.mock('./FieldParticipants',()=>({default:({rows,onChange}:{rows:{worker:string;quantity:string}[];onChange:(r:unknown[])=>void})=><section>{rows.map(r=><p key={r.worker}>Ana · {r.quantity} caixas</p>)}<button onClick={()=>onChange([...rows,{key:'a',worker:'1',present:true,timeIn:'',timeOut:'',nextDay:false,quantity:'10',score:'4',notes:''}])}>Adicionar Ana</button></section>}))
 const user={id:3,username:'Campo',groups:['supervisor'],permissions:['field.record']}
 let host:HTMLDivElement;let root:Root
 async function settle(){await act(async()=>{await new Promise(resolve=>setTimeout(resolve,20))})}
@@ -15,12 +15,13 @@ beforeEach(async()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});v
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals()})
 it('cria e reabre o trabalho sem rede com gravação automática dos participantes',async()=>{
  await act(async()=>root.render(<OfflineField user={user} onSessionExpired={vi.fn()}/>));await settle()
- expect(host.textContent).toContain('Sem internet');await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Novo trabalho')!.click())
+ expect(host.textContent).toContain('Sem ligação');await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent?.includes('Novo trabalho'))!.click())
  await act(async()=>{const select=host.querySelector<HTMLSelectElement>('#offline-contract')!;select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}))});await settle()
+ await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Criar trabalho')!.click());await settle();
  await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Adicionar Ana')!.click());await settle()
  expect((await offlineDb.drafts.where('owner').equals(3).first())?.rows[0].quantity).toBe('10')
  await act(async()=>root.unmount());root=createRoot(host);await act(async()=>root.render(<OfflineField user={user} onSessionExpired={vi.fn()}/>));await settle()
- expect(host.textContent).toContain('Ana · 10 caixas');expect(host.textContent).toContain('Guardado no dispositivo')
+ expect(host.textContent).toContain('Continuar');await act(async()=>host.querySelector<HTMLButtonElement>('.field-continue')!.click());await settle();expect(host.textContent).toContain('Ana · 10 caixas');expect(host.textContent).toContain('Guardado no dispositivo')
 })
 
 it('carrega os dados automaticamente na primeira abertura sem botões de preparação',async()=>{
@@ -31,4 +32,9 @@ it('carrega os dados automaticamente na primeira abertura sem botões de prepara
 it('recuperar a ligação atualiza os dados automaticamente',async()=>{
  const snapshot=await offlineDb.snapshots.get(3);vi.mocked(networkApi).mockReset();vi.mocked(networkApi).mockImplementation(async path=>path==='/auth/me'?{user}:snapshot);
  await act(async()=>root.render(<OfflineField user={user} onSessionExpired={vi.fn()}/>));await settle();expect(networkApi).not.toHaveBeenCalled();vi.stubGlobal('navigator',{onLine:true});await act(async()=>window.dispatchEvent(new Event('online')));await settle();await settle();expect(networkApi).toHaveBeenCalledWith('/field/offline');expect(host.textContent).toContain('Com ligação')
+})
+
+it('não indica tudo sincronizado quando uma fotografia está pendente ou falhou',async()=>{
+ await offlineDb.photos.put({id:'photo',owner:3,draftId:'day',blob:new Blob(['photo'],{type:'image/jpeg'}),worker:'1',pool:'',description:'Caixas',synced:false,error:'Fotografia recusada'});
+ await act(async()=>root.render(<OfflineField user={user} onSessionExpired={vi.fn()}/>));await settle();expect(host.textContent).toContain('Falha no envio');expect(host.textContent).not.toContain('Tudo sincronizado')
 })
