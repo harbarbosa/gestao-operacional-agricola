@@ -19,7 +19,7 @@ it('mostra fechos, saldo exato e registo de pagamentos em modal',async()=>{
 it('só confirma o fecho da atividade depois de consultar os valores e envia a assinatura conferida',async()=>{
  const item={id:1,version:3,status:'draft',work_date:'2026-11-08',team_name:'Equipa',service_name:'Colheita',client_name:'Cliente'}
  vi.mocked(api).mockImplementation(async(path,options)=>options?.method==='POST'?{item:{...item,status:'closed'}}:path.endsWith('/close-preview')?{item,preview_hash:'a'.repeat(64),allocations:[{worker_id:2,worker_name:'Ana',pool_name:'Grupo A',rate:'1',amount_cents:334}]}:{items:[item],total:1})
- await act(async()=>root.render(<WorkLogs onSessionExpired={vi.fn()} onBusyChange={vi.fn()}/>))
+ await act(async()=>root.render(<WorkLogs admin={true} onSessionExpired={vi.fn()} onBusyChange={vi.fn()}/>))
  await act(async()=>host.querySelector<HTMLButtonElement>('[aria-label="Fechar atividade 1"]')!.click())
  expect(document.querySelector('dialog')!.textContent).toContain('3,34 €')
  await act(async()=>[...document.querySelectorAll('dialog button')].find(button=>button.textContent==='Confirmar fecho')!.dispatchEvent(new MouseEvent('click',{bubbles:true})))

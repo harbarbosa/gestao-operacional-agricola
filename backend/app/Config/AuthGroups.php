@@ -7,7 +7,7 @@ class AuthGroups extends \CodeIgniter\Shield\Config\AuthGroups
     public string $defaultGroup = 'worker';
     public array $groups = [
         'admin' => ['title' => 'Administrador', 'description' => 'Administração da empresa.'],
-        'supervisor' => ['title' => 'Chefe de equipa', 'description' => 'Operação das equipas autorizadas.'],
+        'supervisor' => ['title' => 'Controlador de campo', 'description' => 'Operação das equipas autorizadas.'],
         'worker' => ['title' => 'Trabalhador', 'description' => 'Consulta dos próprios dados.'],
     ];
     public array $permissions = [
