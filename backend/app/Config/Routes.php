@@ -88,3 +88,14 @@ $routes->post('api/v1/field/offline/apply','OfflineController::apply',['filter'=
 $routes->post('api/v1/auth/password','AuthController::password',['filter'=>'api-session']);
 $routes->get('api/v1/workers/([1-9][0-9]*)/photo','HarvestsController::viewPortrait/$1',['filter'=>'api-session']);
 $routes->post('api/v1/workers/([1-9][0-9]*)/photo','HarvestsController::workerPortrait/$1',['filter'=>'api-session']);
+
+$adminFinance=['filter'=>'api-session:finance.manage'];
+$routes->get('api/v1/admin/portfolio','AdministrationController::portfolio',$adminFinance);
+$routes->get('api/v1/admin/finance/export','AdministrationController::export',$adminFinance);
+$routes->put('api/v1/harvests/([1-9][0-9]*)','AdministrationController::update/$1',$adminFinance);
+$routes->delete('api/v1/harvests/([1-9][0-9]*)','AdministrationController::deactivate/$1',$adminFinance);
+$routes->get('api/v1/admin/settlements/pending','AdministrationController::pending',$adminFinance);
+$routes->post('api/v1/admin/settlements','AdministrationController::settle',$adminFinance);
+$routes->get('api/v1/admin/settlements/([1-9][0-9]*)','AdministrationController::settlement/$1',$adminFinance);
+$routes->post('api/v1/admin/settlements/([1-9][0-9]*)/payments','AdministrationController::pay/$1',$adminFinance);
+$routes->post('api/v1/harvests/([1-9][0-9]*)/expenses','AdministrationController::expense/$1',$adminFinance);

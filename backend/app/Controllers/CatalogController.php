@@ -36,10 +36,11 @@ class CatalogController extends BaseController
         if (trim($query) !== '') {
             $builder->like('name', trim($query));
         }
+        $state=$this->request->getGet('state')??'';if(!in_array($state,['','active','inactive','blocked','low'],true))return $this->error(422,'Estado inválido.');if($state==='active')$builder->where('is_active',1);if($state==='inactive')$builder->where('is_active',0);if($resource==='workers'&&$state==='blocked')$builder->where('is_blocked',1);if($state==='low'&&$resource==='workers'){$sub=db_connect()->table('agri_work_log_attendees a')->select('a.worker_id')->join('agri_work_logs l','l.id=a.work_log_id')->where('a.present',1)->whereIn('l.status',['submitted','closed'])->groupBy('a.worker_id')->having('AVG(a.score) <',3);$builder->whereIn('id',$sub);}
         $total = $builder->countAllResults(false);
         $rows = $builder->orderBy('id', 'DESC')->get(25, ((int) $page - 1) * 25)->getResultArray();
         return $this->response->setJSON([
-            'items' => array_map(fn ($row) => $this->normalize($row), $rows),
+            'items' => array_map(function($row)use($resource){$r=$this->normalize($row);if($resource==='workers'){$stats=db_connect()->table('agri_work_log_attendees a')->select('AVG(a.score) AS average,COUNT(a.score) AS total')->join('agri_work_logs l','l.id=a.work_log_id')->where('a.worker_id',$r['id'])->where('a.present',1)->whereIn('l.status',['submitted','closed'])->get()->getRowArray();$r['performance_avg']=$stats['average'];$r['evaluation_count']=(int)$stats['total'];}return $r;}, $rows),
             'total' => $total, 'page' => (int) $page, 'pageSize' => 25,
         ]);
     }

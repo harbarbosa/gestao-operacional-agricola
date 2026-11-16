@@ -28,7 +28,7 @@ it('exporta os filtros aplicados e não altera o relatório com filtros ainda n�
   await render()
   await act(async () => {
     const input=host.querySelector<HTMLInputElement>('#report-from')!
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'2026-07-01')
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'01/07/2026')
     input.dispatchEvent(new Event('input',{bubbles:true}))
   })
   await act(async () => host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})))

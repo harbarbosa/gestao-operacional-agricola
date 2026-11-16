@@ -22,9 +22,12 @@ class WorkLogsController extends BaseController
         $builder = db_connect()->table('agri_work_logs');
         if (!FieldAccess::manager()) $builder->groupStart()->where('controller_id',auth()->id())->orGroupStart()->where('harvest_id',null)->whereIn('team_id', FieldAccess::teamIds() ?: [0])->groupEnd()->groupEnd();
         if ($date !== null) { $builder->where('work_date', $date); }
+        foreach(['harvest_id','client_id','controller_id']as$key){$value=$this->request->getGet($key);if($value!==null&&$value!==''){if(!ctype_digit((string)$value)||(int)$value<1)return $this->response->setStatusCode(422)->setJSON(['error'=>'Filtro inválido.']);$builder->where($key,(int)$value);}}
+        foreach(['date_from'=>'>=','date_to'=>'<=']as$key=>$operator){$value=$this->request->getGet($key);if($value!==null&&$value!==''){try{\App\Harvest\HarvestBook::date($value);}catch(FieldProblem $e){return $this->response->setStatusCode(422)->setJSON(['error'=>'Data inválida.']);}$builder->where('work_date '.$operator,$value);}}
+        $status=$this->request->getGet('status');if($status!==null&&$status!==''){if(!in_array($status,['draft','submitted','closed','canceled','draft,canceled'],true))return $this->response->setStatusCode(422)->setJSON(['error'=>'Estado inválido.']);$builder->whereIn('status',explode(',',$status));}
         $total = $builder->countAllResults(false);
         $rows = $builder->orderBy('work_date', 'DESC')->orderBy('id', 'DESC')->get(25, ((int) $page - 1) * 25)->getResultArray();
-        return $this->response->setJSON(['items' => array_map(fn ($row) => \App\Harvest\HarvestBook::operational((new DraftBook(db_connect()))->normalize($row)), $rows), 'total' => $total, 'page' => (int) $page, 'pageSize' => 25]);
+        return $this->response->setJSON(['items' => array_map(fn ($row) => \App\Harvest\HarvestBook::operational((new DraftBook(db_connect()))->get((int)$row['id'])), $rows), 'total' => $total, 'page' => (int) $page, 'pageSize' => 25]);
     }
     public function show(string $id) { if ($deny = $this->access($id)) return $deny; return $this->run(fn ($book, $input) => ['item' => $book->get((int) $id)], false); }
     public function create() { return $this->run(function($book,$input) { if(empty($input['harvest_id'])) FieldAccess::check((int)($input['team_id'] ?? 0)); return $book->create($input,(int)auth()->id()); }, true, true); }

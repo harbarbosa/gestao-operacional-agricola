@@ -115,7 +115,8 @@ export default function WorkLogs({ admin = false, todayMode=false, onSessionExpi
     finally { setBusy(false); onBusyChange(false) }
   }
   async function validateDay(item:WorkLog, action:'validate'|'return') {
-    setBusy(true);onBusyChange(true);setMessage('');try {await api(`/work-logs/${item.id}/${action}`,{method:'POST',body:JSON.stringify({version:item.version})});refresh()}catch(error){if(error instanceof ApiError && error.status===401)onSessionExpired();else setMessage(error instanceof Error?error.message:'Falha na validação.')}finally{setBusy(false);onBusyChange(false)}
+    const returnReason=action==='return'?window.prompt('Motivo da devolução (obrigatório):'):null;if(action==='return'&&(!returnReason||returnReason.trim().length<3))return;
+    setBusy(true);onBusyChange(true);setMessage('');try {await api(`/work-logs/${item.id}/${action}`,{method:'POST',body:JSON.stringify({version:item.version,...(action==='return'?{reason:returnReason}:{})})});refresh()}catch(error){if(error instanceof ApiError && error.status===401)onSessionExpired();else setMessage(error instanceof Error?error.message:'Falha na validação.')}finally{setBusy(false);onBusyChange(false)}
   }
   async function closeActivity() {
     if(!closing) return

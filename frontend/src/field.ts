@@ -5,6 +5,7 @@ export interface Attendee {
   exit_next_day: boolean; payment_quantity: string | null; score: number | null; notes: string | null
 }
 export interface WorkLog {
+  return_reason?:string|null;
   harvest_id?: number | null; controller_id?: number | null; id: number; request_id: string; version: number; status: 'draft' | 'canceled' | 'closed' | 'submitted'; work_date: string
   team_id: number; site_id: number; client_id: number; service_id: number
   team_name: string; site_name: string; client_name: string; service_name: string; responsible_name: string | null

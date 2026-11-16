@@ -1,0 +1,18 @@
+import {useState} from 'react'
+import {api} from './api'
+import {formatDate} from './locale'
+import {Money,Badge,Empty} from './AdminShared'
+import type {Portfolio,AdminContract} from './adminTypes'
+import ContractEditor from './ContractEditor'
+import type {Harvest} from './Harvests'
+import Modal from './Modal'
+import {Icon} from './Icons'
+export default function AdminContracts({portfolio,onOpen,onChanged}:{portfolio:Portfolio;onOpen:(id:number)=>void;onChanged:()=>void}){
+ const [query,setQuery]=useState(''),[status,setStatus]=useState('active'),[editing,setEditing]=useState<Harvest|'new'|null>(null),[removing,setRemoving]=useState<AdminContract|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false)
+ const rows=portfolio.contracts.filter(c=>(!status||c.status===status)&&`${c.name} ${c.client_name}`.toLocaleLowerCase('pt-PT').includes(query.toLocaleLowerCase('pt-PT'))&&(!c.ends_on||c.ends_on>=portfolio.period.from))
+ async function edit(id:number){setBusy(true);setError('');try{setEditing((await api<{item:Harvest}>(`/harvests/${id}`)).item)}catch(e){setError(e instanceof Error?e.message:'Não foi possível abrir.')}finally{setBusy(false)}}
+ async function deactivate(){if(!removing)return;setBusy(true);try{await api(`/harvests/${removing.id}`,{method:'DELETE',body:JSON.stringify({version:removing.version})});setRemoving(null);onChanged()}catch(e){setError(e instanceof Error?e.message:'Não foi possível desativar.')}finally{setBusy(false)}}
+ return <section><div className="section-title"><div><h2>Contratos</h2><p>Abra um contrato para acompanhar produção e financeiro.</p></div><button disabled={busy} onClick={()=>setEditing('new')}>＋ Novo contrato</button></div><div className="admin-filters"><label>Pesquisar contrato ou cliente<input value={query} onChange={e=>setQuery(e.target.value)}/></label><label>Estado<select value={status} onChange={e=>setStatus(e.target.value)}><option value="">Todos</option><option value="active">Em curso</option><option value="closed">Encerrados</option><option value="inactive">Inativos</option></select></label></div><p role="alert">{error}</p><div className="table-wrap"><table><thead><tr><th>Contrato</th><th>Cliente e local</th><th>Início</th><th>Apurado ao cliente</th><th>Saldo a receber</th><th>Estado</th><th>Ações</th></tr></thead><tbody>{rows.map(c=><tr key={c.id}><td><button className="admin-link" onClick={()=>onOpen(c.id)}>{c.name}</button></td><td>{c.client_name}<small>{c.site_name}</small></td><td>{formatDate(c.starts_on)}</td><td><Money value={c.summary.receivable_cents}/></td><td><Money value={c.summary.pending_receipt_cents}/></td><td><Badge status={c.status}/></td><td><div className="row-actions"><button className="icon-action" aria-label={`Editar ${c.name}`} title="Editar condições" disabled={busy} onClick={()=>edit(c.id)}><Icon name="edit"/></button><button className="icon-action danger" aria-label={`Desativar ${c.name}`} title="Desativar e preservar histórico" disabled={busy||c.status!=='active'} onClick={()=>setRemoving(c)}><Icon name="trash"/></button></div></td></tr>)}</tbody></table></div>{!rows.length&&<Empty>Sem contratos neste estado e período.</Empty>}
+ {editing&&<ContractEditor item={editing==='new'?undefined:editing} onClose={()=>setEditing(null)} onSaved={id=>{setEditing(null);onChanged();onOpen(id)}}/>}{removing&&<Modal title="Desativar contrato" busy={busy} onClose={()=>setRemoving(null)}><p>Desativar {removing.name}? O histórico e os movimentos serão preservados. Novos lançamentos de campo ficam impedidos.</p><p role="alert">{error}</p><button disabled={busy} onClick={deactivate}>Confirmar desativação</button></Modal>}
+ </section>
+}

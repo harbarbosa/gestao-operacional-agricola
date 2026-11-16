@@ -1,0 +1,10 @@
+import {useState,type ReactNode} from 'react'
+import {formatCents} from './locale'
+import PortugalDateInput from './PortugalDateInput'
+export function Money({value}:{value:unknown}){return <>{formatCents(String(value??0))}</>}
+export function Metric({label,value}:{label:string;value:unknown}){return <div className="admin-metric"><span>{label}</span><strong><Money value={value}/></strong></div>}
+export function Badge({status}:{status:string}){const labels:Record<string,string>={active:'Em curso',closed:'Encerrado',inactive:'Inativo',draft:'Rascunho',submitted:'Por validar',canceled:'Cancelado',partial:'Parcial',paid:'Pago',pending:'Por pagar'};return <span className={`admin-badge ${status}`}>{labels[status]??status}</span>}
+export function DateField({id,label,value,onChange,disabled=false}:{id:string;label:string;value:string;onChange:(v:string)=>void;disabled?:boolean}){return <label className="admin-field" htmlFor={id}>{label}<PortugalDateInput id={id} value={value} disabled={disabled} onChange={onChange} onValidityChange={()=>{}}/></label>}
+export function Period({from,to,onApply}:{from:string;to:string;onApply:(from:string,to:string)=>void}){const [a,setA]=useState(from),[b,setB]=useState(to),[validA,setValidA]=useState(true),[validB,setValidB]=useState(true);return <form className="admin-period" onSubmit={e=>{e.preventDefault();if(validA&&validB&&a<=b)onApply(a,b)}}><label htmlFor="admin-from">De<PortugalDateInput id="admin-from" value={a} disabled={false} onChange={setA} onValidityChange={setValidA}/></label><label htmlFor="admin-to">Até<PortugalDateInput id="admin-to" value={b} disabled={false} onChange={setB} onValidityChange={setValidB}/></label><button disabled={!validA||!validB||a>b}>Aplicar período</button></form>}
+export function Tabs({items,value,onChange}:{items:{key:string;label:string}[];value:string;onChange:(v:string)=>void}){return <div className="admin-tabs" role="tablist">{items.map(i=><button key={i.key} role="tab" aria-selected={i.key===value} onClick={()=>onChange(i.key)}>{i.label}</button>)}</div>}
+export function Empty({children}:{children:ReactNode}){return <p className="admin-empty">{children}</p>}
