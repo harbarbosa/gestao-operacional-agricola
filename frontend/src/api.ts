@@ -1,5 +1,6 @@
 import {offlineDb,activeOwner,offlineMode,storeWorkerPhoto,offlineRead,createLocalWorker,rememberOfflineUser,offlineUser,deactivateOffline} from './offlineStore'
 export interface CurrentUser {
+  simple_mode?:boolean
   id: number
   username: string
   groups: string[]

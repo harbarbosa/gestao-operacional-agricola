@@ -18,6 +18,7 @@ import { Icon, Brand } from './Icons'
 import Modal from './Modal'
 import Account from './Account'
 import AdminApplication from './AdminApplication'
+import SimpleApplication from './SimpleApplication'
 
 
 
@@ -75,7 +76,7 @@ export default function App() {
     { key: 'reports', label: 'Relatórios', icon: 'chart', allowed: user?.permissions.includes('reports.view') },
     { key: 'users', label: 'Utilizadores e permissões', icon: 'teams', allowed: user?.permissions.includes('users.view') },
     { key: 'account', label: 'Conta e definições', icon: 'settings', allowed: true },
-  ].filter(item => item.allowed)
+  ].filter(item => item.allowed&&(user?.simple_mode===false||['overview','work-logs','account'].includes(item.key)))
   const title = fieldTitle ?? navigation.find(item => item.key === resource)?.label ?? 'Visão geral'
   function navigate(key: string) { setMobileMenu(false); setResource(key as typeof resource); setMessage('') }
   if (checking) return <main className="login-page"><Brand /><p role="status">A verificar sessão…</p></main>
@@ -83,6 +84,7 @@ export default function App() {
     <label htmlFor="email">Email</label><input id="email" type="email" autoComplete="username" required maxLength={254} value={email} onChange={e => setEmail(e.target.value)} disabled={busy} />
     <label htmlFor="password">Palavra-passe</label><input id="password" type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} disabled={busy} />
     <button disabled={busy||!online}>{busy ? 'A iniciar…' : 'Entrar na plataforma'}</button></form><p role="status" aria-live="polite">{message}</p></section></main>
+  if(user.permissions.includes('finance.manage')&&user.simple_mode!==false)return <SimpleApplication user={user} onLogout={logout} onSessionExpired={sessionExpired}/>
   if(user.permissions.includes('finance.manage'))return <AdminApplication user={user} onLogout={logout} onSessionExpired={sessionExpired}/>
   return <CatalogAccess.Provider value={{ canCreate: user.permissions.includes('catalog.manage'), canCreateWorkers: user.permissions.includes('field.record'), onSessionExpired: sessionExpired }}><div className={`app-shell ${user.permissions.includes('field.record')&&!user.permissions.includes('finance.manage')?'controller-shell':''}`}>
     <aside className="sidebar"><Brand /><nav aria-label="Menu principal">{navigation.map(item => <button key={item.key} disabled={busy || catalogBusy} aria-current={resource === item.key ? 'page' : undefined} onClick={() => navigate(item.key)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</nav><div className="sidebar-bottom"><span className="connection-dot" /> Gestão operacional agrícola<small>Portugal · Área de gestão</small></div></aside>

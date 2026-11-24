@@ -8,7 +8,7 @@ import {networkApi} from './api'
 import {offlineDb,rememberOfflineUser} from './offlineStore'
 vi.mock('./api',async original=>({...await original<typeof import('./api')>(),networkApi:vi.fn()}))
 vi.mock('./FieldParticipants',()=>({default:({rows,onChange}:{rows:{worker:string;quantity:string}[];onChange:(r:unknown[])=>void})=><section>{rows.map(r=><p key={r.worker}>Ana · {r.quantity} caixas</p>)}<button onClick={()=>onChange([...rows,{key:'a',worker:'1',present:true,timeIn:'',timeOut:'',nextDay:false,quantity:'10',score:'4',notes:''}])}>Adicionar Ana</button></section>}))
-const user={id:3,username:'Campo',groups:['supervisor'],permissions:['field.record']}
+const user={simple_mode:false,id:3,username:'Campo',groups:['supervisor'],permissions:['field.record']}
 let host:HTMLDivElement;let root:Root
 async function settle(){await act(async()=>{await new Promise(resolve=>setTimeout(resolve,20))})}
 beforeEach(async()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});vi.stubGlobal('navigator',{onLine:false});localStorage.clear();await Promise.all([offlineDb.profiles.clear(),offlineDb.snapshots.clear(),offlineDb.drafts.clear(),offlineDb.workers.clear(),offlineDb.photos.clear(),offlineDb.portraits.clear()]);await rememberOfflineUser(user);await offlineDb.snapshots.put({owner:3,prepared_at:'2026-11-12T08:00:00Z',contracts:[{id:1,name:'Laranja',status:'active',starts_on:'2026-11-01',client_id:1,client_name:'Quinta',site_id:1,site_name:'Pomar',service_id:1,service_name:'Colheita',payment_unit_id:1,payment_unit_name:'Caixa',billing_unit_id:2,billing_unit_name:'kg'}],workers:[],logs:[]});host=document.createElement('div');document.body.append(host);root=createRoot(host)})

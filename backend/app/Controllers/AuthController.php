@@ -52,6 +52,7 @@ class AuthController extends BaseController
         return $this->response->setHeader('Cache-Control', 'no-store')->setJSON(['user' => [
             'id' => (int) $user->id,
             'username' => $user->username,
+            'simple_mode'=>!config('Agroperi')->legacyEnabled,
             'groups' => $user->getGroups(),
             'permissions' => array_values(array_filter(
                 array_keys(config('AuthGroups')->permissions),

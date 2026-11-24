@@ -30,7 +30,7 @@ class WorkLogsController extends BaseController
         return $this->response->setJSON(['items' => array_map(fn ($row) => \App\Harvest\HarvestBook::operational((new DraftBook(db_connect()))->get((int)$row['id'])), $rows), 'total' => $total, 'page' => (int) $page, 'pageSize' => 25]);
     }
     public function show(string $id) { if ($deny = $this->access($id)) return $deny; return $this->run(fn ($book, $input) => ['item' => $book->get((int) $id)], false); }
-    public function create() { return $this->run(function($book,$input) { if(empty($input['harvest_id'])) FieldAccess::check((int)($input['team_id'] ?? 0)); return $book->create($input,(int)auth()->id()); }, true, true); }
+    public function create() { return $this->run(function($book,$input) { if(empty($input['harvest_id'])&&empty($input['simple_mode'])) FieldAccess::check((int)($input['team_id'] ?? 0)); return $book->create($input,(int)auth()->id()); }, true, true); }
     public function update(string $id) { if ($deny = $this->access($id)) return $deny; return $this->run(fn ($book, $input) => $book->update((int) $id, $input, (int) auth()->id())); }
     public function cancel(string $id) { if ($deny = $this->access($id)) return $deny; return $this->run(fn ($book, $input) => $book->update((int) $id, $input, (int) auth()->id(), true)); }
     private function access(string $id)
@@ -44,7 +44,7 @@ class WorkLogsController extends BaseController
             $input = $body ? $this->request->getJSON(true) : [];
             if (! is_array($input)) { throw new FieldProblem(422, 'Envie um objeto com os dados.'); }
             FieldAccess::requireField();
-            if ($this->request->getMethod() === 'POST' && $this->request->getUri()->getPath() === 'api/v1/work-logs' && isset($input['team_id']) && empty($input['harvest_id'])) FieldAccess::check((int)$input['team_id']);
+            if ($this->request->getMethod() === 'POST' && $this->request->getUri()->getPath() === 'api/v1/work-logs' && isset($input['team_id']) && empty($input['harvest_id'])&&empty($input['simple_mode'])) FieldAccess::check((int)$input['team_id']);
             $result = $operation(new DraftBook(db_connect()), $input);
             if (!\App\Harvest\HarvestBook::admin() && isset($result['item'])) $result['item']=\App\Harvest\HarvestBook::operational($result['item']);
             return $this->response->setStatusCode($create && ! $result['replayed'] ? 201 : 200)->setJSON($result);

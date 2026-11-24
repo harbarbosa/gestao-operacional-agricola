@@ -100,6 +100,10 @@ class ReportExport
                 $lines[] = implode(' | ', $parts);
             }
         }
+        return self::textPdf($lines);
+    }
+    public static function textPdf(array $lines):string
+    {
         $wrapped = [];
         foreach ($lines as $line) foreach (explode("\n", wordwrap(iconv('UTF-8', 'Windows-1252//TRANSLIT', $line), 105, "\n", true)) as $part) $wrapped[] = $part;
         $pages = array_chunk($wrapped, 59);

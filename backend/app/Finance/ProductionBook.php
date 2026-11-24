@@ -110,7 +110,7 @@ class ProductionBook
             if(!$this->lock('agri_workers',$worker)) throw new FieldProblem(404,'Trabalhador inexistente.');
             $existing=$this->db->table('agri_settlements')->where('request_id',$request)->get()->getRowArray();
             if($existing) { if(!hash_equals($existing['request_hash'],$hash)) throw new FieldProblem(409,'Identificador já utilizado.'); return ['item'=>$this->settlement((int)$existing['id']),'replayed'=>true]; }
-            $drafts=$this->db->table('agri_work_logs l')->join('agri_work_log_attendees a','a.work_log_id=l.id')->where('a.worker_id',$worker)->where('a.present',1)->where('l.work_date >=',$from)->where('l.work_date <=',$to)->where('l.status','draft')->countAllResults();
+            $drafts=$this->db->table('agri_work_logs l')->join('agri_work_log_attendees a','a.work_log_id=l.id')->where('a.worker_id',$worker)->where('a.present',1)->where('l.work_date >=',$from)->where('l.work_date <=',$to)->whereIn('l.status',['draft','submitted'])->countAllResults();
             if($drafts) throw new FieldProblem(409,'Existem atividades por fechar para este trabalhador no período.');
             $items=$this->pending($worker,$from,$to); if(!hash_equals(self::pendingHash($worker,$from,$to,$items),$preview)) throw new FieldProblem(409,'A produção mudou. Consulte novamente antes de fechar.'); if(!$items) throw new FieldProblem(422,'Sem produção pendente de fecho neste período.');
             $total=BigInteger::zero(); foreach($items as $item) $total=$total->plus($item['amount_cents']);

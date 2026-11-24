@@ -36,7 +36,7 @@ class OfflineBook
    else{
     FieldAccess::checkLog($log);if(($data['work_date']??null)!==$log['work_date']||(int)($data['harvest_id']??0)!==(int)$log['harvest_id'])throw new FieldProblem(409,'Contrato ou data diferem do trabalho original. Reveja a versão do servidor.');if((int)$log['created_by']!==(int)auth()->id())throw new FieldProblem(403,'Trabalho de outro utilizador.');
     $expected=$version===0?1:$version;if((int)$log['version']!==$expected||$log['status']!=='draft')throw new FieldProblem(409,'O trabalho foi alterado ou encerrado no servidor. Consulte o histórico antes de resolver.');
-    $changes=array_intersect_key($data,array_flip(['notes','billing_quantity','attendees','pools']));$changes['version']=$expected;$result=$book->update((int)$log['id'],$changes,(int)auth()->id());
+    $changes=array_intersect_key($data,array_flip(['notes','billing_quantity','attendees','pools','activity_name','unit_name']));$changes['version']=$expected;$result=$book->update((int)$log['id'],$changes,(int)auth()->id());
    }
    return ['item'=>HarvestBook::operational($result['item'])];
   });

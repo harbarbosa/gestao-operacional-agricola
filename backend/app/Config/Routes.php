@@ -99,3 +99,6 @@ $routes->post('api/v1/admin/settlements','AdministrationController::settle',$adm
 $routes->get('api/v1/admin/settlements/([1-9][0-9]*)','AdministrationController::settlement/$1',$adminFinance);
 $routes->post('api/v1/admin/settlements/([1-9][0-9]*)/payments','AdministrationController::pay/$1',$adminFinance);
 $routes->post('api/v1/harvests/([1-9][0-9]*)/expenses','AdministrationController::expense/$1',$adminFinance);
+
+$routes->get('api/v1/simple/statement','SimpleController::statement',['filter'=>'api-session:finance.manage']);
+$routes->get('api/v1/simple/workers/([1-9][0-9]*)/statement','SimpleController::statement/$1',['filter'=>'api-session:finance.manage']);
