@@ -1,0 +1,19 @@
+// @vitest-environment happy-dom
+import {act} from 'react'
+import {createRoot,type Root} from 'react-dom/client'
+import {beforeEach,afterEach,expect,it,vi} from 'vitest'
+import AdminDashboard from './AdminDashboard'
+import AdminContracts from './AdminContracts'
+import AdminPayments from './AdminPayments'
+import {api} from './api'
+import type {Portfolio} from './adminTypes'
+vi.mock('./api',async original=>({...await original<typeof import('./api')>(),api:vi.fn()}))
+const summary={received_cents:900000,paid_cents:540000,receivable_cents:1200000,payable_cents:720000,pending_receipt_cents:300000,pending_payment_cents:180000,expense_cents:120000,cash_cents:240000,margin_cents:360000}
+const base={id:1,name:'Contrato uva',client_id:1,client_name:'Cliente',site_name:'Quinta',starts_on:'2026-11-01',ends_on:null,status:'active',version:1,payment_unit_name:'Caixa',billing_unit_name:'kg',summary}
+const data:Portfolio={contracts:[base,{...base,id:2,name:'Contrato encerrado',status:'closed'}],totals:{...summary,received_period_cents:100000,paid_period_cents:50000,expense_period_cents:10000},movements:[],expenses:[],settlements:[{id:1,harvest_id:1,contract_name:'Contrato uva',worker_id:1,worker_name:'Ana',date_from:'2026-11-01',date_to:'2026-11-15',total_cents:'90000',paid_cents:'50000',version:2}],pending:[],flow:{},waiting:3,settlements_with_balance:1,period:{from:'2026-11-01',to:'2026-11-15'}}
+let host:HTMLDivElement,root:Root
+beforeEach(()=>{Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});HTMLDialogElement.prototype.showModal=function(){this.open=true};HTMLDialogElement.prototype.close=function(){this.open=false};host=document.createElement('div');document.body.append(host);root=createRoot(host);vi.mocked(api).mockReset();vi.mocked(api).mockResolvedValue({item:{deliveries:[]}})})
+afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.clearAllMocks()})
+it('distingue movimentos do período dos saldos finais, sem gráficos vazios',async()=>{const open=vi.fn();await act(async()=>root.render(<AdminDashboard data={data} onContract={open} onNavigate={vi.fn()}/>));expect(host.textContent).toContain('Recebido no período');expect(host.querySelector('.admin-metric')!.textContent).toContain('1 000,00 €');expect(host.textContent).toContain('A receber à data final');expect(host.textContent).not.toContain('Contrato encerrado');expect(host.textContent).not.toContain('Produção da semana');await act(async()=>host.querySelector<HTMLButtonElement>('tbody button')!.click());expect(open).toHaveBeenCalledWith(1)})
+it('o filtro em curso exclui contratos encerrados e os nomes abrem a ficha',async()=>{const open=vi.fn();await act(async()=>root.render(<AdminContracts portfolio={data} onOpen={open} onChanged={vi.fn()}/>));expect(host.querySelector('tbody')!.textContent).not.toContain('Contrato encerrado');await act(async()=>{const select=host.querySelector('select')!;select.value='closed';select.dispatchEvent(new Event('change',{bubbles:true}))});expect(host.querySelector('tbody')!.textContent).toContain('Contrato encerrado');expect(host.querySelector('tbody')!.textContent).not.toContain('Contrato uva')})
+it('o pagamento usa o fecho e o mesmo endpoint central, com versão e saldo parcial',async()=>{const changed=vi.fn();await act(async()=>root.render(<AdminPayments portfolio={data} onChanged={changed} onLegacy={vi.fn()}/>));await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Registar pagamento')!.click());expect(document.querySelector('dialog')!.textContent).toContain('Saldo: 400,00 €');await act(async()=>document.querySelector('dialog form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));const call=vi.mocked(api).mock.calls.find(([p])=>p==='/admin/settlements/1/payments')!;expect(JSON.parse(String(call[1]!.body))).toMatchObject({version:2,amount:'400.00',method:'Transferência'});expect(changed).toHaveBeenCalledOnce()})

@@ -36,10 +36,11 @@ class CatalogController extends BaseController
         if (trim($query) !== '') {
             $builder->like('name', trim($query));
         }
+        $state=$this->request->getGet('state')??'';if(!in_array($state,['','active','inactive','blocked','low'],true))return $this->error(422,'Estado inválido.');if($state==='active')$builder->where('is_active',1);if($state==='inactive')$builder->where('is_active',0);if($resource==='workers'&&$state==='blocked')$builder->where('is_blocked',1);if($state==='low'&&$resource==='workers'){$sub=db_connect()->table('agri_work_log_attendees a')->select('a.worker_id')->join('agri_work_logs l','l.id=a.work_log_id')->where('a.present',1)->whereIn('l.status',['submitted','closed'])->groupBy('a.worker_id')->having('AVG(a.score) <',3);$builder->whereIn('id',$sub);}
         $total = $builder->countAllResults(false);
         $rows = $builder->orderBy('id', 'DESC')->get(25, ((int) $page - 1) * 25)->getResultArray();
         return $this->response->setJSON([
-            'items' => array_map(fn ($row) => $this->normalize($row), $rows),
+            'items' => array_map(function($row)use($resource){$r=$this->normalize($row);if($resource==='workers'){$stats=db_connect()->table('agri_work_log_attendees a')->select('AVG(a.score) AS average,COUNT(a.score) AS total')->join('agri_work_logs l','l.id=a.work_log_id')->where('a.worker_id',$r['id'])->where('a.present',1)->whereIn('l.status',['submitted','closed'])->get()->getRowArray();$r['performance_avg']=$stats['average'];$r['evaluation_count']=(int)$stats['total'];}return $r;}, $rows),
             'total' => $total, 'page' => (int) $page, 'pageSize' => 25,
         ]);
     }
@@ -92,6 +93,10 @@ class CatalogController extends BaseController
                 'prices' => ['service_id' => 'services', 'worker_id' => 'workers', 'client_id' => 'clients', 'unit_id' => 'units'],
                 'work_logs' => ['team_id' => 'teams', 'site_id' => 'sites', 'service_id' => 'services', 'client_id' => 'clients', 'payment_unit_id' => 'units', 'billing_unit_id' => 'units'],
                 'work_log_attendees' => ['worker_id' => 'workers'],
+                'contracts' => ['client_id'=>'clients','site_id'=>'sites','service_id'=>'services','billing_unit_id'=>'units','payment_unit_id'=>'units'],
+                'harvests' => ['client_id'=>'clients','site_id'=>'sites','service_id'=>'services','billing_unit_id'=>'units','payment_unit_id'=>'units'],
+                'harvest_movements' => ['worker_id'=>'workers'],
+                'worker_portraits' => ['worker_id'=>'workers'],
             ] as $other => $fields) {
                 foreach ($fields as $field => $target) {
                     if ($target === $resource && $db->table('agri_' . $other)->where($field, $id)->countAllResults() > 0) { $linked = true; }
@@ -243,7 +248,7 @@ class CatalogController extends BaseController
         foreach (['id', 'version', 'team_id', 'client_id', 'payment_unit_id', 'billing_unit_id', 'manager_user_id'] as $field) {
             if (isset($row[$field])) { $row[$field] = (int) $row[$field]; }
         }
-        $row['is_active'] = (bool) $row['is_active'];
+        $row['is_active'] = (bool) $row['is_active'];if(array_key_exists('is_blocked',$row))$row['is_blocked']=(bool)$row['is_blocked'];
         return $row;
     }
 

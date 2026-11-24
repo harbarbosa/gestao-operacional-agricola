@@ -44,15 +44,15 @@ function UserEditor({ item, metadata, currentUser, onClose, onSaved, onSessionEx
   return <Modal title={!manage ? 'Consultar utilizador' : item ? `Editar: ${item.username}` : 'Novo utilizador'} busy={busy} onClose={onClose}>
     <form className="record-form" onSubmit={save}>
       <p role="status" aria-live="polite">{message}</p>
-      <div className="form-field"><label htmlFor="user-name">Nome de utilizador *</label><input id="user-name" required maxLength={30} autoComplete="off" value={name} disabled={busy || !manage} onChange={event => setName(event.target.value)} />{errors.username && <small role="alert">{errors.username}</small>}</div>
+      <fieldset><legend>Dados de acesso</legend><div className="form-field"><label htmlFor="user-name">Nome de utilizador *</label><input id="user-name" required maxLength={30} autoComplete="off" value={name} disabled={busy || !manage} onChange={event => setName(event.target.value)} />{errors.username && <small role="alert">{errors.username}</small>}</div>
       <div className="form-field"><label htmlFor="user-email">Email de acesso *</label><input id="user-email" type="email" required maxLength={254} autoComplete="off" value={email} disabled={busy || !manage} onChange={event => setEmail(event.target.value)} />{errors.email && <small role="alert">{errors.email}</small>}</div>
       {manage && <div className="form-field"><label htmlFor="user-password">{item ? 'Nova palavra-passe (opcional)' : 'Palavra-passe *'}</label><input id="user-password" type="password" required={!item} minLength={8} maxLength={72} autoComplete="new-password" value={password} disabled={busy} onChange={event => setPassword(event.target.value)} />{errors.password && <small role="alert">{errors.password}</small>}</div>}
-      <div className="form-field"><label htmlFor="user-role">Perfil *</label><select id="user-role" value={role} disabled={busy || !manage || self} onChange={event => setRole(event.target.value)}>{Object.entries(metadata.groups).map(([key, group]) => <option key={key} value={key}>{group.title}</option>)}</select>{errors.role && <small role="alert">{errors.role}</small>}</div>
-      <fieldset className="user-permissions" disabled={busy || !manage || self}><legend>Permissões</legend>
+      </fieldset><fieldset><legend>Perfil e permissões</legend><div className="form-field"><label htmlFor="user-role">Perfil *</label><select id="user-role" value={role} disabled={busy || !manage || self} onChange={event => setRole(event.target.value)}>{Object.entries(metadata.groups).map(([key, group]) => <option key={key} value={key}>{group.title}</option>)}</select>{errors.role && <small role="alert">{errors.role}</small>}</div>
+      <p>{metadata.groups[role]?.description}</p><details><summary>Permissões avançadas</summary><fieldset className="user-permissions" disabled={busy || !manage || self}><legend>Permissões</legend>
         {Object.entries(metadata.permissions).map(([key, description]) => <label className="permission-option" key={key}><input type="checkbox" checked={inherited.includes(key) || extra.includes(key)} disabled={inherited.includes(key)} onChange={event => toggle(key, event.target.checked)} /><span>{description}<small>{inherited.includes(key) ? 'Incluída no perfil' : 'Permissão adicional'}</small></span></label>)}
         {errors.permissions && <small role="alert">{errors.permissions}</small>}
-      </fieldset>
-      <label className="checkbox"><input type="checkbox" checked={active} disabled={busy || !manage || self} onChange={event => setActive(event.target.checked)} />Conta ativa</label>
+      </fieldset></details>
+      <label className="checkbox"><input type="checkbox" checked={active} disabled={busy || !manage || self} onChange={event => setActive(event.target.checked)} />Conta ativa</label></fieldset>
 
       <div className="actions">{manage && <button disabled={busy}>{busy ? 'A guardar…' : 'Guardar utilizador'}</button>}<button type="button" disabled={busy} onClick={onClose}>{manage ? 'Cancelar' : 'Fechar'}</button></div>
     </form>

@@ -18,3 +18,5 @@ test('aplica máscara portuguesa e preserva prefixos internacionais explícitos'
   expect(maskPhone('')).toBe('')
   expect(maskPhone('+5516999999999')).toMatch(/^\+55/)
 })
+
+test('telefone do trabalhador fica vazio ou sem prefixo de país automático',async()=>{const {maskWorkerPhone}=await import('./locale');expect(maskWorkerPhone('')).toBe('');expect(maskWorkerPhone('912345678')).toBe('912 345 678');expect(maskWorkerPhone('+351 912 345 678')).toBe('912 345 678')})

@@ -14,6 +14,8 @@ class ApiSession implements FilterInterface
             return service('response')->setStatusCode(401)->setHeader('Cache-Control', 'no-store')
                 ->setJSON(['error' => 'É necessário iniciar sessão.']);
         }
+        $path=ltrim($request->getUri()->getPath(),'/');
+        if(!config('Agroperi')->legacyEnabled&&preg_match('#^api/v1/(?:contracts|harvests|clients|sites|services|units|prices|catalog/(?:clients|sites|services|units|teams)|admin/portfolio|admin/finance|admin/settlements)(?:/|$)#',$path))return service('response')->setStatusCode(403)->setJSON(['error'=>'Módulo desativado no modo simplificado.']);
         $user = auth('session')->user();
         if (! $user->active || $user->isBanned()) {
             auth('session')->logout();

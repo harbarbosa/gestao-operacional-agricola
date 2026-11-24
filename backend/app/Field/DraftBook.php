@@ -45,7 +45,7 @@ class DraftBook
         $rows = []; $seen = [];
         foreach ($value as $row) {
             if (! is_array($row)) { throw new FieldProblem(422, 'Participante inválido.'); }
-            self::keys($row, ['worker_id', 'present', 'time_in', 'time_out', 'exit_next_day', 'payment_quantity', 'score', 'notes', 'pool_key']);
+            self::keys($row, ['worker_id', 'present', 'time_in', 'time_out', 'exit_next_day', 'payment_quantity', 'score', 'notes', 'pool_key', 'payment_rate']);
             $id = self::id($row['worker_id'] ?? null);
             if (isset($seen[$id])) { throw new FieldProblem(422, 'O mesmo trabalhador não pode aparecer duas vezes no diário.'); }
             $seen[$id] = true;
@@ -62,7 +62,8 @@ class DraftBook
             if (($out !== null && $in === null) || ($nextDay && ($in === null || $out === null))) { throw new FieldProblem(422, 'Complete a entrada antes de registar saída ou turno noturno.'); }
             if ($in !== null && $out !== null && ((! $nextDay && $out <= $in) || ($nextDay && $out > $in))) { throw new FieldProblem(422, 'Reveja os horários e a indicação de saída no dia seguinte (máximo 24 horas).'); }
             $pool = self::text($row['pool_key'] ?? null,32); if ($pool !== null && (!preg_match('/^[a-zA-Z0-9_-]+$/D',$pool) || !$present || $quantity !== null)) throw new FieldProblem(422,'No trabalho em grupo, registe a produção no grupo, sem quantidade individual.');
-            $rows[] = ['pool_key'=>$pool, 'worker_id' => $id, 'present' => $present, 'time_in' => $in, 'time_out' => $out, 'exit_next_day' => $nextDay, 'payment_quantity' => $quantity, 'score' => $score, 'notes' => self::text($row['notes'] ?? null, 500)];
+            $rate=array_key_exists('payment_rate',$row)&&$row['payment_rate']!==null?\App\Harvest\HarvestBook::decimal($row['payment_rate'],false):null;
+            $rows[] = ['payment_rate'=>$rate,'pool_key'=>$pool, 'worker_id' => $id, 'present' => $present, 'time_in' => $in, 'time_out' => $out, 'exit_next_day' => $nextDay, 'payment_quantity' => $quantity, 'score' => $score, 'notes' => self::text($row['notes'] ?? null, 500)];
         }
         usort($rows, static fn ($a, $b) => $a['worker_id'] <=> $b['worker_id']);
         return $rows;
@@ -94,13 +95,16 @@ class DraftBook
     }
     public function create(array $input, int $actor): array
     {
-        self::keys($input, ['request_id', 'work_date', 'team_id', 'site_id', 'client_id', 'service_id', 'service_version', 'notes', 'billing_quantity', 'attendees', 'pools']);
+        if (!empty($input['simple_mode'])) return $this->createSimple($input,$actor);
+        if (!empty($input['harvest_id'])) $input=(new \App\Harvest\HarvestBook($this->db))->activityInput($input);
+        self::keys($input, ['harvest_id', 'controller_id', 'request_id', 'work_date', 'team_id', 'site_id', 'client_id', 'service_id', 'service_version', 'notes', 'billing_quantity', 'attendees', 'pools']);
         $request = $input['request_id'] ?? null;
         if (! is_string($request) || ! preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $request)) { throw new FieldProblem(422, 'Identificador UUID de envio inválido.'); }
         $data = $this->contents($input) + [
-            'work_date' => self::date($input['work_date'] ?? null), 'team_id' => self::id($input['team_id'] ?? null),
+            'work_date' => self::date($input['work_date'] ?? null), 'team_id' => !empty($input['harvest_id']) ? null : self::id($input['team_id'] ?? null),
             'site_id' => self::id($input['site_id'] ?? null), 'client_id' => self::id($input['client_id'] ?? null), 'service_id' => self::id($input['service_id'] ?? null), 'service_version' => self::id($input['service_version'] ?? null),
         ];
+        if (!empty($input['harvest_id'])) $data += ['harvest_id'=>(int)$input['harvest_id'],'controller_id'=>(int)$input['controller_id']];
         $hash = hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
         if ($existing = $this->replay($request, $hash, $actor)) { return $existing; }
         return $this->transaction(function () use ($data, $request, $hash, $actor) {
@@ -108,13 +112,14 @@ class DraftBook
             if ($existing = $this->replay($request, $hash, $actor)) { return $existing; }
             if (! $service || ! $service['is_active']) { throw new FieldProblem(422, 'Serviço inexistente ou inativo.'); }
             if ((int) $service['version'] !== $data['service_version']) { throw new FieldProblem(409, 'O serviço foi alterado. Confirme as unidades e as quantidades antes de voltar a enviar.'); }
-            $team = $this->record('teams', $data['team_id']); $site = $this->record('sites', $data['site_id']);
+            $team = $data['team_id'] ? $this->record('teams', $data['team_id']) : ['name'=>'Atividade diária','responsible_name'=>auth()->getProvider()->findById($data['controller_id'])->username]; $site = $this->record('sites', $data['site_id']);
             if ((int) $site['client_id'] !== $data['client_id']) { throw new FieldProblem(409, 'O local não pertence ao cliente indicado. Reveja a seleção.'); }
             $client = $this->record('clients', (int) $site['client_id']);
             $rows = $this->validateWorkers($data['attendees'], $data['team_id']);
             $header = $data; unset($header['attendees'], $header['service_version'], $header['pools']);
             foreach (['payment', 'billing'] as $kind) {
-                $unit = $this->record('units', (int) $service[$kind . '_unit_id']);
+                $unitId=!empty($data['harvest_id']) ? $this->db->table('agri_harvests')->where('id',$data['harvest_id'])->get()->getRowArray()[$kind.'_unit_id'] : $service[$kind.'_unit_id'];
+                $unit = $this->record('units', (int)$unitId);
                 $header[$kind . '_unit_id'] = (int) $unit['id']; $header[$kind . '_unit_name'] = $unit['name']; $header[$kind . '_unit_code'] = $unit['code'];
             }
             $now = gmdate('Y-m-d H:i:s');
@@ -125,12 +130,26 @@ class DraftBook
             return ['item' => $after, 'replayed' => false];
         });
     }
-    private function validateWorkers(array $rows, int $team, array $old = []): array
+    private function createSimple(array $input,int $actor):array
+    {
+        self::keys($input,['simple_mode','request_id','work_date','activity_name','unit_name','notes','attendees','pools','billing_quantity']);
+        $request=$input['request_id']??null;if(!is_string($request)||!preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/D',$request))throw new FieldProblem(422,'Identificador inválido.');
+        $name=self::text($input['activity_name']??null,160);$unit=self::text($input['unit_name']??null,160);if(!$name||!$unit)throw new FieldProblem(422,'Preencha o nome da atividade e a unidade de produção.');
+        $data=$this->contents($input)+['work_date'=>self::date($input['work_date']??null),'service_name'=>$name,'payment_unit_name'=>$unit];$hash=hash('sha256',json_encode($data,JSON_THROW_ON_ERROR));if($old=$this->replay($request,$hash,$actor))return $old;
+        return $this->transaction(function()use($data,$request,$hash,$actor){
+            $this->lock('users',$actor);if($old=$this->replay($request,$hash,$actor))return $old;
+            $rows=$this->validateWorkers($data['attendees'],null);$header=$data;unset($header['attendees'],$header['pools']);$now=gmdate('Y-m-d H:i:s');
+            $header+=['simple_mode'=>1,'harvest_id'=>null,'controller_id'=>$actor,'team_id'=>null,'site_id'=>null,'service_id'=>null,'client_id'=>null,'payment_unit_id'=>null,'billing_unit_id'=>null,'team_name'=>'','site_name'=>'','client_name'=>'','payment_unit_code'=>'','billing_unit_code'=>'','billing_unit_name'=>'','responsible_name'=>auth()->user()->username,'status'=>'draft','version'=>1,'request_id'=>$request,'creation_hash'=>$hash,'created_by'=>$actor,'updated_by'=>$actor,'created_at'=>$now,'updated_at'=>$now];
+            $this->db->table('agri_work_logs')->insert($header);$id=(int)$this->db->insertID();$this->replaceAttendees($id,$rows);$this->replacePools($id,$data['pools']);$after=$this->get($id);$this->audit($id,$actor,'create',null,$after);return ['item'=>$after,'replayed'=>false];
+        });
+    }
+    private function validateWorkers(array $rows, ?int $team, array $old = []): array
     {
         $previous = array_column($old, null, 'worker_id');
         foreach ($rows as &$row) {
             $worker=$this->lock('agri_workers',$row['worker_id']); if(!$worker || (!isset($previous[$row['worker_id']]) && !$worker['is_active'])) throw new FieldProblem(422,'Trabalhador inexistente ou inativo.');
-            if (! isset($previous[$row['worker_id']]) && (int) $worker['team_id'] !== $team) { $this->db->table('agri_workers')->where('id',$worker['id'])->set('version','version + 1',false)->update(['team_id'=>$team,'updated_at'=>gmdate('Y-m-d H:i:s')]); $after=$this->db->table('agri_workers')->where('id',$worker['id'])->get()->getRowArray(); $this->db->table('agri_catalog_audit')->insert(['resource'=>'workers','record_id'=>$worker['id'],'actor_id'=>auth()->id(),'action'=>'associate','before_json'=>json_encode($worker),'after_json'=>json_encode($after),'created_at'=>gmdate('Y-m-d H:i:s')]); }
+            if ($team !== null && ! isset($previous[$row['worker_id']]) && (int) $worker['team_id'] !== $team) { $this->db->table('agri_workers')->where('id',$worker['id'])->set('version','version + 1',false)->update(['team_id'=>$team,'updated_at'=>gmdate('Y-m-d H:i:s')]); $after=$this->db->table('agri_workers')->where('id',$worker['id'])->get()->getRowArray(); $this->db->table('agri_catalog_audit')->insert(['resource'=>'workers','record_id'=>$worker['id'],'actor_id'=>auth()->id(),'action'=>'associate','before_json'=>json_encode($worker),'after_json'=>json_encode($after),'created_at'=>gmdate('Y-m-d H:i:s')]); }
+            if($worker['is_blocked'] && $row['present']) throw new FieldProblem(422,'Trabalhador bloqueado: '.$worker['name'].'. '.$worker['block_reason']);
             $row['worker_name'] = $previous[$row['worker_id']]['worker_name'] ?? $worker['name'];
         }
         return $rows;
@@ -147,15 +166,18 @@ class DraftBook
     }
     public function update(int $id, array $input, int $actor, bool $cancel = false): array
     {
-        self::keys($input, $cancel ? ['version', 'reason'] : ['version', 'notes', 'billing_quantity', 'attendees', 'pools']);
+        self::keys($input, $cancel ? ['version', 'reason'] : ['version', 'notes', 'billing_quantity', 'attendees', 'pools', 'activity_name', 'unit_name']);
         $version = self::id($input['version'] ?? null);
         $content = $cancel ? ['cancel_reason' => self::text($input['reason'] ?? null, 500)] : $this->contents($input);
         if ($cancel && mb_strlen($content['cancel_reason'] ?? '') < 3) { throw new FieldProblem(422, 'Indique o motivo do cancelamento (3 a 500 caracteres).'); }
         return $this->transaction(function () use ($id, $input, $content, $version, $actor, $cancel) {
             if (! $this->lock('agri_work_logs', $id)) { throw new FieldProblem(404, 'Diário não encontrado.'); }
             $before = $this->get($id);
+            if (!empty($before['harvest_id'])) { $h=(new \App\Harvest\HarvestBook($this->db))->access((int)$before['harvest_id']); if($h['status']!=='active')throw new FieldProblem(409,'Colheita encerrada.'); }
             if ($before['version'] !== $version || $before['status'] !== 'draft') { throw new FieldProblem(409, 'O diário foi alterado ou cancelado. Recarregue antes de editar.'); }
             $data = $content;
+            if(!$cancel&&(!empty($before['simple_mode']))){foreach(['activity_name'=>'service_name','unit_name'=>'payment_unit_name'] as $key=>$column)if(array_key_exists($key,$input)){$text=self::text($input[$key],160);if(!$text)throw new FieldProblem(422,'Preencha atividade e unidade.');$data[$column]=$text;} }
+            elseif(!$cancel&&(isset($input['activity_name'])||isset($input['unit_name'])))throw new FieldProblem(422,'Campos de atividade simplificada não permitidos.');
             if ($cancel) { $data['status'] = 'canceled'; }
             else { unset($data['attendees'], $data['pools']); $rows = $this->validateWorkers($content['attendees'], $before['team_id'], $before['attendees']); }
             $data += ['version' => $version + 1, 'updated_by' => $actor, 'updated_at' => gmdate('Y-m-d H:i:s')];
@@ -187,7 +209,7 @@ class DraftBook
     public function normalize(array $row): array
     {
         unset($row['creation_hash']);
-        foreach (['id', 'team_id', 'site_id', 'client_id', 'service_id', 'payment_unit_id', 'billing_unit_id', 'version', 'created_by', 'updated_by'] as $key) { $row[$key] = (int) $row[$key]; }
+        foreach (['id', 'team_id', 'site_id', 'client_id', 'service_id', 'payment_unit_id', 'billing_unit_id', 'version', 'created_by', 'updated_by'] as $key) { $row[$key] = $row[$key]===null ? null : (int) $row[$key]; }
         $row['billing_quantity'] = $row['billing_quantity'] === null ? null : PriceBook::decimal((string) $row['billing_quantity'], 'quantity');
         return $row;
     }
